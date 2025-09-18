@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8Paws - Billing Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#D4AF37', 
+                        secondary: '#8C7A1E',
+                        gold: {
+                            50: '#FFFBEB',
+                            100: '#FEF3C7',
+                            200: '#FDE68A',
+                            300: '#FCD34D',
+                            400: '#FBBF24',
+                            500: '#D4AF37',
+                            600: '#D97706',
+                            700: '#B45309',
+                            800: '#92400E',
+                            900: '#78350F'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+        .gradient-bg { background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
+        .card-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .btn-hover { transition: all 0.3s ease; }
+        .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 8px 15px -3px rgba(212, 175, 55, 0.4); }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex flex-col">
+    <!-- Minimal decorative background -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-gold-200/20 to-gold-300/10 rounded-full blur-2xl"></div>
+        <div class="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-gold-100/20 to-gold-200/10 rounded-full blur-2xl"></div>
+    </div>
+
+    <!-- Compact Header -->
+    <header class="relative bg-white/80 backdrop-blur-sm shadow-sm border-b border-gold-100 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center py-3">
+                <div class="flex items-center space-x-3">
+                    <img src="../animates_logo.png" alt="8Paws Logo" class="h-10 w-10 object-contain">
+                    <div>
+                        <p class="text-sm font-semibold text-gold-700">Animates PH</p>
+                        <p class="text-xs text-gold-600">Billing Management</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation -->
+                <nav class="hidden md:flex items-center space-x-4">
+                    <!-- <a href="check_in.html" class="text-xs text-gray-700 hover:text-gold-600 transition-colors">Check-in</a>
+                    <a href="pet_tracking.html" class="text-xs text-gray-700 hover:text-gold-600 transition-colors">Pet Tracking</a>
+                    <a href="customer_portal.html" class="text-xs text-gray-700 hover:text-gold-600 transition-colors">Customer Portal</a> -->
+                    <!-- <a href="#" onclick="showSection('manual-billing')" class="text-gold-600 font-semibold text-xs">Billing</a> -->
+                </nav>
+
+                <!-- User Info -->
+                <div class="flex items-center space-x-3">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-medium text-gray-900" id="userName">Cashier</p>
+                        <p class="text-xs text-gray-500" id="userRole">Billing Staff</p>
+                    </div>
+                    <div class="w-8 h-8 bg-gradient-to-br from-gold-500 to-gold-600 rounded-full flex items-center justify-center text-white font-medium text-sm" id="userInitials">
+                        C
+                    </div>
+                    <button id="logoutBtn" class="ml-2 px-2 py-1 text-xs border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 hidden sm:block">Sign out</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow px-4 py-4">
+        <div class="max-w-7xl mx-auto">
+        <!-- Compact Stats Overview -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div id="todayRevenueCard" class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-4 cursor-pointer">
+                <div class="flex items-center">
+                        <div class="p-2 bg-green-100 rounded-lg">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-xs font-medium text-gray-600">Today's Revenue</p>
+                            <p class="text-lg font-bold text-gray-900" id="todayRevenue">₱0</p>
+                    </div>
+                </div>
+            </div>
+
+                <div id="pendingBillsCard" class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-4 cursor-pointer">
+                <div class="flex items-center">
+                        <div class="p-2 bg-blue-100 rounded-lg">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-xs font-medium text-gray-600">Pending Bills</p>
+                            <p class="text-lg font-bold text-gray-900" id="pendingBills">0</p>
+                    </div>
+                </div>
+            </div>
+
+                <div id="voidsCard" class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-4 cursor-pointer">
+                <div class="flex items-center">
+                        <div class="p-2 bg-yellow-100 rounded-lg">
+                        <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-xs font-medium text-gray-600">Voids</p>
+                            <p class="text-lg font-bold text-gray-900" id="voidCount">0</p>
+                    </div>
+                </div>
+            </div>
+
+                <div id="weekRevenueCard" class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-4 cursor-pointer">
+                <div class="flex items-center">
+                        <div class="p-2 bg-purple-100 rounded-lg">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-xs font-medium text-gray-600">This Week</p>
+                            <p class="text-lg font-bold text-gray-900" id="weekRevenue">₱0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compact Quick Actions -->
+            <div class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-4 mb-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <div class="w-6 h-6 bg-gold-100 rounded-full flex items-center justify-center">
+                        <svg class="w-4 h-4 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    Quick Actions
+                </h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <button onclick="showSection('manual-billing')" class="p-3 bg-gradient-to-br from-gold-50 to-gold-100 border border-gold-200 rounded-lg text-center hover:shadow-md transition-all duration-200 btn-hover">
+                        <div class="w-8 h-8 bg-gradient-to-br from-gold-200 to-gold-300 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <svg class="w-4 h-4 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                        </div>
+                    <p class="text-xs font-medium text-gray-900">Manual Billing</p>
+                </button>
+                    <button onclick="showSection('pending-bills')" class="p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg text-center hover:shadow-md transition-all duration-200 btn-hover">
+                        <div class="w-8 h-8 bg-gradient-to-br from-yellow-200 to-yellow-300 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3l-3-3m-3 3l3-3m-3 3l-3-3m-3 3l3 3m-3-3l-3 3"></path>
+                            </svg>
+                        </div>
+                    <p class="text-xs font-medium text-gray-900">Pending Bills</p>
+                </button>
+                    <button onclick="showSection('recent-transactions')" class="p-3 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg text-center hover:shadow-md transition-all duration-200 btn-hover">
+                        <div class="w-8 h-8 bg-gradient-to-br from-green-200 to-green-300 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                    <p class="text-xs font-medium text-gray-900">Recent Transactions</p>
+                </button>
+                    <button onclick="generateReport()" class="p-3 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg text-center hover:shadow-md transition-all duration-200 btn-hover">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-200 to-blue-300 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                    <p class="text-xs font-medium text-gray-900">Generate Report</p>
+                </button>
+            </div>
+        </div>
+
+        <!-- Manual Billing Section -->
+        <section id="manual-billing" class="section">
+                <div class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <div class="w-6 h-6 bg-gold-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                        </div>
+                        Manual Billing Entry
+                    </h2>
+                
+                <!-- Compact Manual Entry Form -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <h4 class="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        Enter Booking Information
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">RFID Tag ID</label>
+                            <input type="text" id="manualRfidInput" placeholder="Enter RFID Tag ID" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Booking ID (Optional)</label>
+                            <input type="text" id="manualBookingInput" placeholder="Enter Booking ID" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                        </div>
+                        <div class="flex items-end">
+                            <div class="flex space-x-2 w-full">
+                                <button onclick="processBilling()" class="btn-hover bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm flex-1">
+                                    Generate Bill
+                                </button>
+                                <button onclick="clearManualForm()" class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compact Bill Generation Area -->
+                <div id="billGeneration" class="hidden">
+                    <div class="border-2 border-gray-200 rounded-lg p-6 bg-white/50 backdrop-blur-sm">
+                        <!-- Compact Pet & Service Information -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <div class="bg-gradient-to-r from-gold-50 to-yellow-50 border border-gold-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                                    <svg class="w-4 h-4 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                                    </svg>
+                                    Pet Information
+                                </h4>
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <p><span class="font-medium text-gray-700">Pet Name:</span> <span id="billPetName" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Breed:</span> <span id="billPetBreed" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Owner:</span> <span id="billOwnerName" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Phone:</span> <span id="billOwnerPhone" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">RFID Tag:</span> <span id="billRfidTag" class="font-mono text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Payment Status:</span> <span id="billPaymentStatus" class="text-gray-900">-</span></p>
+                                </div>
+                                </div>
+                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3l-3-3m-3 3l3-3m-3 3l-3-3m-3 3l3 3m-3-3l-3 3"></path>
+                                    </svg>
+                                    Service Timeline
+                                </h4>
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <p><span class="font-medium text-gray-700">Check-in:</span> <span id="billCheckinTime" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Bathing:</span> <span id="billBathTime" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Grooming:</span> <span id="billGroomingTime" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Duration:</span> <span id="billDuration" class="text-gray-900">-</span></p>
+                                    <p><span class="font-medium text-gray-700">Staff:</span> <span id="billStaff" class="text-gray-900">-</span></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Compact Services & Billing -->
+                        <div class="border-t border-gray-200 pt-4">
+                            <h4 class="font-semibold text-gray-900 mb-4 flex items-center gap-2 text-sm">
+                                <svg class="w-4 h-4 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Service Breakdown
+                            </h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Service</th>
+                                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Base Price</th>
+                                            <th class="px-4 py-2 text-center text-xs font-medium text-gray-600">Size Modifier</th>
+                                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="serviceBreakdown" class="divide-y divide-gray-200">
+                                        <!-- Services will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Compact Bill Summary -->
+                            <div class="mt-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Subtotal:</span>
+                                        <span id="billSubtotal" class="font-medium">₱0</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Discount:</span>
+                                        <span class="text-green-600 font-medium">-<span id="billDiscount">₱0</span></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Tax (12%):</span>
+                                        <span id="billTax" class="font-medium">₱0</span>
+                                    </div>
+                                    <div class="flex justify-between text-lg font-bold">
+                                        <span class="text-gray-900">Total:</span>
+                                        <span class="text-gold-600" id="billTotal">₱0</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Compact Payment Options -->
+                            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Discount</label>
+                                        <select id="discountSelect" onchange="updateBillTotal()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                                            <option value="0">No Discount</option>
+                                            <option value="5">Senior/PWD (5%)</option>
+                                            <option value="10">Loyalty (10%)</option>
+                                            <option value="15">First Time (15%)</option>
+                                            <option value="custom">Custom</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Custom Discount (₱)</label>
+                                        <input type="number" id="customDiscount" placeholder="0" min="0" onchange="updateBillTotal()" 
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
+                                        <select id="paymentMethod" onchange="handlePaymentMethodChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                                            <option value="cash">Cash</option>
+                                            <option value="card">Credit/Debit Card</option>
+                                            <option value="online">Online Payment</option>
+                                        </select>
+                                    </div>
+                                    <div id="cashPaymentFields">
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Amount Tendered (₱)</label>
+                                        <input type="number" id="amountTendered" placeholder="0" min="0" step="0.01" onchange="calculateChange()" 
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                                    </div>
+                                    <div id="onlinePaymentFields" class="hidden">
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Platform</label>
+                                        <select id="paymentPlatform" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                                            <option value="">Select Platform</option>
+                                            <option value="gcash">GCash</option>
+                                            <option value="maya">Maya</option>
+                                            <option value="paymaya">PayMaya</option>
+                                            <option value="bank_transfer">Bank Transfer</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Change Display -->
+                                <div id="changeDisplay" class="mt-3 hidden">
+                                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm font-medium text-green-800">Change:</span>
+                                            <span class="text-lg font-bold text-green-600" id="changeAmount">₱0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Compact Online Payment Reference -->
+                            <div id="onlinePaymentReference" class="mt-4 hidden">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Reference Number</label>
+                                        <input type="text" id="paymentReference" placeholder="Enter reference number" 
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Transaction Date</label>
+                                        <input type="datetime-local" id="transactionDate" 
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Compact Action Buttons -->
+                            <div class="flex justify-between mt-4">
+                                <div class="flex space-x-2">
+                                    <button onclick="saveDraft()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm">
+                                        Save Draft
+                                    </button>
+                                    <button onclick="printBill()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm">
+                                        Print Bill
+                                    </button>
+                                </div>
+                                <!-- Hidden fields for payment processing -->
+                                <input type="hidden" id="currentBookingId" value="">
+                                
+                                <button onclick="processPayment()" class="btn-hover px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg font-medium transition-all duration-200 text-sm">
+                                    Process Payment
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Compact Pending Bills Section -->
+        <section id="pending-bills" class="section hidden">
+            <div class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <div class="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3l-3-3m-3 3l3-3m-3 3l-3-3m-3 3l3 3m-3-3l-3 3"></path>
+                            </svg>
+                        </div>
+                            Pending Bills
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button onclick="refreshPendingBills()" class="px-3 py-1 bg-gold-500 hover:bg-gold-600 text-white rounded-lg text-xs font-medium transition-colors">
+                                Refresh
+                            </button>
+                            <button onclick="exportPendingBills()" class="px-3 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium transition-colors">
+                                Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="pendingBillsContainer" class="space-y-3">
+                        <!-- Pending bills will be populated here -->
+                    </div>
+            </div>
+        </section>
+
+        <!-- Recent Transactions Section -->
+        <section id="recent-transactions" class="section hidden">
+            <div class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <div class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        Recent Transactions
+                    </h2>
+                    <div class="flex space-x-2">
+                        <button onclick="refreshTransactions()" class="px-3 py-1 bg-gold-500 hover:bg-gold-600 text-white rounded-lg text-xs font-medium transition-colors">
+                            Refresh
+                        </button>
+                        <button onclick="exportTransactions()" class="px-3 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium transition-colors">
+                            Export
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Search and Filter -->
+                <div class="mb-4 flex flex-wrap gap-3">
+                    <div class="flex-1 min-w-48">
+                        <input type="text" id="transactionSearch" placeholder="Search by customer, pet, or RFID..." 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                    </div>
+                    <div class="flex space-x-2">
+                        <select id="statusFilter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                            <option value="">All Status</option>
+                            <option value="completed">Completed</option>
+                            <option value="voided">Voided</option>
+                            <option value="refunded">Refunded</option>
+                        </select>
+                        <select id="dateFilter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent text-sm">
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Transactions Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">Date/Time</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">Customer</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">Pet</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">RFID</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-600">Amount</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-600">Method</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-600">Status</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-600">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTable" class="divide-y divide-gray-200">
+                            <!-- Transactions will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="mt-4 flex justify-between items-center text-sm text-gray-600">
+                    <div>
+                        Showing <span id="showingFrom">1</span> to <span id="showingTo">10</span> of <span id="totalTransactions">0</span> transactions
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="prevPage" onclick="previousPage()" class="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Previous
+                        </button>
+                        <button id="nextPage" onclick="nextPage()" class="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Voided Transactions Section -->
+        <section id="voided-transactions" class="section hidden">
+            <div class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <div class="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.5 5.5l13 13" />
+                            </svg>
+                        </div>
+                        Voided Transactions
+                    </h2>
+                    <div class="flex space-x-2">
+                        <button onclick="loadVoidedTransactions()" class="px-3 py-1 bg-gold-500 hover:bg-gold-600 text-white rounded-lg text-xs font-medium transition-colors">Refresh</button>
+                        <button onclick="exportVoidedTransactions()" class="px-3 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium transition-colors">Export</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">Date/Time</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">Customer</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">Pet</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">RFID</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-600">Amount</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-600">Method</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-600">Reason</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-600">Voided At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="voidedTransactionsTable" class="divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+    </main>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 card-shadow">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
+                <p class="text-gray-600 mb-3 text-sm">Bill has been processed successfully.</p>
+                <p id="receiptStatus" class="text-green-600 mb-4 text-sm">Receipt has been sent to customer email.</p>
+                <div class="flex justify-center space-x-3">
+                    <button onclick="printReceipt()" class="btn-hover bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm">
+                        Print Receipt
+                    </button>
+                    <button onclick="closeModal()" class="btn-hover bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm">
+                        Continue
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div id="receiptModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-0 max-w-3xl w-full mx-4 card-shadow overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Receipt</h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="printReceiptFromModal()" class="px-2 py-1 text-sm border rounded hover:bg-gray-50">Print</button>
+                    <button onclick="closeReceiptModal()" class="ml-2 text-gray-500 hover:text-gray-700">✕</button>
+                </div>
+            </div>
+            <div id="receiptContainer" class="w-full overflow-auto bg-gray-50" style="height:85vh;">
+                <iframe id="receiptFrame" class="w-full" scrolling="auto" style="height:100%; border:0; background:white; display:block;"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Void Transaction Modal -->
+    <div id="voidModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 card-shadow">
+            <div class="text-center mb-4">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Void Transaction</h3>
+                <p class="text-gray-600 text-sm">This action cannot be undone. Please provide a reason for voiding this transaction.</p>
+            </div>
+            
+            <!-- Transaction Details -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-4 text-sm">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <span class="font-medium text-gray-700">Customer:</span>
+                        <span id="voidCustomerName" class="text-gray-900 ml-2">-</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">Amount:</span>
+                        <span id="voidAmount" class="text-gray-900 ml-2">-</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">Date:</span>
+                        <span id="voidDate" class="text-gray-900 ml-2">-</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">Transaction ID:</span>
+                        <span id="voidTransactionId" class="text-gray-900 ml-2">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Void Reason Form -->
+            <form id="voidForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Reason for Void *</label>
+                    <select id="voidReason" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                        <option value="">Select a reason...</option>
+                        <option value="customer_request">Customer Request</option>
+                        <option value="service_issue">Service Issue</option>
+                        <option value="payment_error">Payment Error</option>
+                        <option value="duplicate_transaction">Duplicate Transaction</option>
+                        <option value="system_error">System Error</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
+                    <textarea id="voidNotes" rows="3" placeholder="Provide additional details..." 
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"></textarea>
+                </div>
+                
+                <div class="flex justify-center space-x-3 pt-4">
+                    <button type="button" onclick="closeVoidModal()" 
+                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
+                        Confirm Void
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/billing_management.js"></script>
+</body>
+</html>
