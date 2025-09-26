@@ -1624,6 +1624,17 @@ function updateServiceSelection() {
         selectedServices.push(pkg);
         selectedServiceNames.add(pkg.name.split(' (Customized)')[0]); // Add base package name for conflicts
         totalAmount += pkg.price;
+
+        // Store package name in customizations for API retrieval
+        const packageName = pkg.name.replace(' (Customized)', '');
+        if (!packageCustomizations[pkg.id]) {
+            packageCustomizations[pkg.id] = {
+                selected: true,
+                packageName: packageName,
+                excludedServices: pkg.customizations?.excludedServices || [],
+                includedServices: pkg.customizations?.includedServices || []
+            };
+        }
     });
 
     // Define service conflicts for customizable package system
@@ -2150,6 +2161,12 @@ async function handleAppointmentSubmission(event) {
         // Extract service IDs for API submission
         const serviceIds = selectedServices.map(service => service.id);
 
+        // Prepare services with their calculated prices
+        const servicesWithPrices = selectedServices.map(service => ({
+            id: service.id,
+            price: service.price
+        }));
+
         const appointmentData = {
             action: 'book_appointment',
             petName: petName,
@@ -2161,7 +2178,7 @@ async function handleAppointmentSubmission(event) {
             preferredDate: preferredDate,
             preferredTime: preferredTime,
             preferredStaff: formData.get('preferredStaff'),
-            services: serviceIds,
+            services: servicesWithPrices,
             packageCustomizations: packageCustomizationsData,
             specialInstructions: formData.get('specialInstructions')
         };
@@ -2581,6 +2598,10 @@ async function loadUserAppointmentsWithFilter(status = 'all') {
 
 // Modal functions for appointments
 function showAppointmentDetailsModal(appointment) {
+    // Initialize variables for package processing
+    let processedServices = new Set();
+    let processedPackages = new Set();
+
     // Create modal HTML for viewing appointment details
     const modalHtml = `
         <div id="appointmentDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
@@ -2593,12 +2614,15 @@ function showAppointmentDetailsModal(appointment) {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                             </svg>
                         </div>
-                        <div class="flex items-center space-x-4">
-                            <h2 class="text-2xl font-bold text-gray-900">Appointment Details</h2>
-                            <div class="inline-flex items-center px-3 py-2 rounded-full ${getStatusBadgeClass(appointment.status)}">
-                                <div class="w-2 h-2 rounded-full mr-2 ${getStatusColorCircle(appointment.status)}"></div>
-                                <span class="text-sm font-medium capitalize">${appointment.status}</span>
+                        <div>
+                            <div class="flex items-center space-x-4 mb-1">
+                                <h2 class="text-2xl font-bold text-gray-900">Appointment Details</h2>
+                                <div class="inline-flex items-center px-3 py-2 rounded-full ${getStatusBadgeClass(appointment.status)}">
+                                    <div class="w-2 h-2 rounded-full mr-2 ${getStatusColorCircle(appointment.status)}"></div>
+                                    <span class="text-sm font-medium capitalize">${appointment.status}</span>
+                                </div>
                             </div>
+                            <p class="text-sm text-gray-600">Booking ID: ${appointment.id}</p>
                         </div>
                     </div>
                     <button onclick="closeModal('appointmentDetailsModal')" class="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -2606,11 +2630,6 @@ function showAppointmentDetailsModal(appointment) {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
-                </div>
-
-                <!-- Booking ID at Top -->
-                <div class="mb-6">
-                    <p class="text-sm text-gray-600">Booking ID: ${appointment.id}</p>
                 </div>
 
                 <!-- Main Content - Single Column Layout -->
@@ -2740,18 +2759,8 @@ function showAppointmentDetailsModal(appointment) {
                             </svg>
                             Services (${appointment.services ? appointment.services.length : 0})
                         </h3>
-                        <div class="space-y-3 max-h-80 overflow-y-auto">
-                            ${appointment.services ? appointment.services.map(service => `
-                                <div class="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
-                                    <div class="flex justify-between items-start">
-                                        <div class="flex-1">
-                                            <span class="font-medium text-gray-900">${service.name}</span>
-                                            ${service.description ? `<p class="text-sm text-gray-600 mt-1">${service.description}</p>` : ''}
-                                        </div>
-                                        <span class="text-lg font-bold text-primary ml-4">₱${parseFloat(service.price || 0).toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            `).join('') : '<p class="text-gray-500 text-center py-4">No services selected</p>'}
+                        <div class="space-y-3 max-h-80 overflow-y-auto" id="appointmentServicesList">
+                            <!-- Services will be populated here -->
                         </div>
                     </div>
                 </div>
@@ -2791,6 +2800,9 @@ function showAppointmentDetailsModal(appointment) {
 
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Populate services list
+    populateAppointmentServices(appointment);
 }
 
 function showEditAppointmentModal(appointment) {
@@ -3203,6 +3215,129 @@ async function handleEditAppointmentSubmission(event, appointmentId) {
         console.error('Error updating appointment:', error);
         showNotification('Error updating appointment', 'error');
     }
+}
+
+// Toggle package details visibility
+function togglePackageDetails(packageId) {
+    const details = document.getElementById(`${packageId}-details`);
+    const icon = document.getElementById(`${packageId}-icon`);
+
+    if (details && icon) {
+        if (details.classList.contains('hidden')) {
+            details.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            details.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+}
+
+// Populate appointment services with package expansion
+function populateAppointmentServices(appointment) {
+    const container = document.getElementById('appointmentServicesList');
+
+    if (!container) return;
+
+    if (!appointment.services || appointment.services.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">No services selected</p>';
+        return;
+    }
+
+    const serviceNames = appointment.services.map(s => s.name);
+    let processedServices = new Set();
+    let processedPackages = new Set();
+    let html = '';
+
+    // First, identify and display packages with collapsible contents
+    serviceNames.forEach(serviceName => {
+        if (processedServices.has(serviceName)) return;
+
+        // Check if this service name matches a package name (strip "(Customized)" if present)
+        const baseServiceName = serviceName.replace(' (Customized)', '');
+        if (packageContents[baseServiceName] && !processedPackages.has(baseServiceName)) {
+            const packageItems = packageContents[baseServiceName];
+            const packageId = `package-${baseServiceName.replace(/\s+/g, '-').toLowerCase()}`;
+
+            // Package with same styling as other services
+            html += '<div class="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow mb-2">';
+            html += '<div class="package-header cursor-pointer flex items-center justify-between" onclick="togglePackageDetails(\'' + packageId + '\')">';
+            html += '<span class="font-medium text-gray-900">' + serviceName + '</span>';
+            html += '<div class="flex items-center space-x-2">';
+            html += '<span class="text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Package</span>';
+            html += '<svg id="' + packageId + '-icon" class="w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+            html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
+            html += '</svg></div></div></div>';
+            html += '<div id="' + packageId + '-details" class="package-details hidden bg-white p-4 rounded-lg border border-gray-200 ml-4 space-y-2 border-l-4 border-l-purple-200">';
+
+            // Check if this package was customized
+            let packageCustomizations = null;
+            if (appointment.package_customizations) {
+                try {
+                    packageCustomizations = typeof appointment.package_customizations === 'string' ?
+                        JSON.parse(appointment.package_customizations) : appointment.package_customizations;
+                } catch (e) {
+                    console.error('Error parsing package customizations:', e);
+                }
+            }
+
+            // Get customization data for this specific package
+            const packageData = packageCustomizations ? packageCustomizations[baseServiceName] : null;
+
+            // Show package contents based on customization
+            packageItems.forEach(item => {
+                const isExcluded = packageData && packageData.excludedServices &&
+                                 packageData.excludedServices.includes(item.name);
+
+                if (!isExcluded) {
+                    // Included service
+                    html += '<div class="flex justify-between items-center text-sm text-green-700">';
+                    html += '<span>✓ ' + item.name + '</span>';
+                    html += '<span class="text-xs">(included in package)</span>';
+                    html += '</div>';
+                    processedServices.add(item.name);
+                } else {
+                    // Excluded service
+                    html += '<div class="flex justify-between items-center text-sm text-gray-400 line-through">';
+                    html += '<span>✗ ' + item.name + '</span>';
+                    html += '<span class="text-xs">(excluded from package)</span>';
+                    html += '</div>';
+                }
+            });
+
+            html += '</div>';
+            processedPackages.add(baseServiceName);
+            processedServices.add(serviceName);
+        }
+    });
+
+    // Then display remaining services that are not part of packages
+    serviceNames.forEach(serviceName => {
+        if (processedServices.has(serviceName)) return;
+
+        // Regular individual service
+        let servicePrice = 0;
+        let serviceCategory = '';
+        appointment.services.forEach(s => {
+            if (s.name === serviceName) {
+                servicePrice = parseFloat(s.price || 0);
+                serviceCategory = s.category || '';
+            }
+        });
+
+        html += '<div class="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">';
+        html += '<div class="flex justify-between items-start">';
+        html += '<div class="flex-1">';
+        html += '<span class="font-medium text-gray-900">' + serviceName + '</span>';
+        if (serviceCategory) {
+            html += '<p class="text-sm text-gray-600 mt-1">' + serviceCategory + '</p>';
+        }
+        html += '</div>';
+        html += '<span class="text-lg font-bold text-primary ml-4">₱' + servicePrice.toFixed(2) + '</span>';
+        html += '</div></div>';
+    });
+
+    container.innerHTML = html || '<p class="text-gray-500 text-center py-4">No services selected</p>';
 }
 
 // Add this to your DOMContentLoaded event listener in customer_portal.js

@@ -913,13 +913,19 @@ async function showViewAppointmentModal(appointment) {
                                 if (!appointment.services || appointment.services.length === 0) return '<p class="text-gray-500">No services</p>';
 
                                 const serviceNames = appointment.services.map(s => s.name);
-                                let html = '';
+                                let html = '<div style="background: yellow; padding: 5px; margin-bottom: 10px;">DEBUG: Processing ' + serviceNames.length + ' services</div>';
+
+                                // Check if we have package customizations
+                                let hasPackageCustomizations = false;
+                                let processedPackages = new Set();
+                                let processedServices = new Set();
 
                                 if (appointment.package_customizations) {
                                     try {
                                         const storedCustomizations = JSON.parse(appointment.package_customizations);
+                                        hasPackageCustomizations = true;
 
-                                        // Add packages with detailed contents
+                                        // Process customized packages
                                         Object.entries(storedCustomizations).forEach(([pkgName, customization]) => {
                                             if (customization.selected && servicesData.package) {
                                                 const packageService = servicesData.package.find(p => p.name === pkgName);
@@ -941,6 +947,7 @@ async function showViewAppointmentModal(appointment) {
                                                             <span>✓ ${item.name}</span>
                                                             <span class="text-xs">(included)</span>
                                                         </div>`;
+                                                        processedServices.add(item.name);
                                                     });
 
                                                     // Excluded services
@@ -952,63 +959,68 @@ async function showViewAppointmentModal(appointment) {
                                                     });
 
                                                     html += '<div class="mb-3"></div>';
+                                                    processedPackages.add(pkgName);
                                                 }
                                             }
                                         });
-
-                                        // Add individual services not in packages
-                                        serviceNames.forEach(serviceName => {
-                                            let isInPackage = false;
-                                            Object.entries(storedCustomizations).forEach(([pkgName, customization]) => {
-                                                if (customization.selected && packageContents[pkgName]) {
-                                                    const pkgIncludedServices = packageContents[pkgName].filter(item =>
-                                                        !(customization.excludedServices || []).includes(item.name)
-                                                    ).map(item => item.name);
-
-                                                    if (pkgIncludedServices.includes(serviceName)) {
-                                                        isInPackage = true;
-                                                    }
-                                                }
-                                            });
-
-                                            if (!isInPackage) {
-                                                // Find service price
-                                                let servicePrice = 0;
-                                                Object.keys(servicesData).forEach(category => {
-                                                    const service = servicesData[category].find(s => s.name === serviceName);
-                                                    if (service) {
-                                                        servicePrice = getServicePrice(service, appointment.pet_size || 'medium');
-                                                    }
-                                                });
-
-                                                html += `<div class="flex justify-between items-center py-2">
-                                                    <span>${serviceName}</span>
-                                                    <span class="font-semibold">₱${servicePrice.toFixed(2)}</span>
-                                                </div>`;
-                                            }
-                                        });
-
-                                        return html || '<p class="text-gray-500">No services</p>';
                                     } catch (e) {
-                                        // Fallback to raw services if JSON parsing fails
-                                        return serviceNames.map(service => `<div class="flex justify-between items-center py-2"><span>${service}</span></div>`).join('');
+                                        console.error('Error parsing package customizations:', e);
+                                        hasPackageCustomizations = false;
                                     }
-                                } else {
-                                    // No packages detected, show raw services with prices
-                                    return serviceNames.map(serviceName => {
-                                        let servicePrice = 0;
-                                        Object.keys(servicesData).forEach(category => {
-                                            const service = servicesData[category].find(s => s.name === serviceName);
-                                            if (service) {
-                                                servicePrice = getServicePrice(service, appointment.pet_size || 'medium');
-                                            }
-                                        });
-                                        return `<div class="flex justify-between items-center py-2">
-                                            <span>${serviceName}</span>
-                                            <span class="font-semibold">₱${servicePrice.toFixed(2)}</span>
-                                        </div>`;
-                                    }).join('');
                                 }
+
+                                // First, identify and display packages with collapsible contents
+                                serviceNames.forEach(serviceName => {
+                                    if (processedServices.has(serviceName)) return;
+
+                                    // Check if this service name matches a package name (strip "(Customized)" if present)
+                                    const baseServiceName = serviceName.replace(' (Customized)', '');
+                                    if (packageContents[baseServiceName] && !processedPackages.has(baseServiceName)) {
+                                        const packageItems = packageContents[baseServiceName];
+                                        const packageId = `package-${baseServiceName.replace(/\s+/g, '-').toLowerCase()}`;
+
+                                        // Package header with toggle
+                                        html += '<div class="package-header cursor-pointer font-medium text-gray-900 border-b border-gray-200 pb-1 mb-2 flex items-center justify-between" onclick="togglePackageDetails(\'' + packageId + '\')">';
+                                        html += '<span>' + serviceName + ' (click to expand)</span>';
+                                        html += '<svg id="' + packageId + '-icon" class="w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+                                        html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
+                                        html += '</svg></div>';
+                                        html += '<div id="' + packageId + '-details" class="package-details hidden ml-4 space-y-1 mb-3">';
+
+                                        // Show all package contents as included
+                                        packageItems.forEach(item => {
+                                            html += `<div class="flex justify-between items-center text-sm text-green-700">
+                                                <span>✓ ${item.name}</span>
+                                                <span class="text-xs">(included in package)</span>
+                                            </div>`;
+                                            processedServices.add(item.name);
+                                        });
+
+                                        html += '</div>';
+                                        processedPackages.add(baseServiceName);
+                                    }
+                                });
+
+                                // Then display remaining services that are not part of packages
+                                serviceNames.forEach(serviceName => {
+                                    if (processedServices.has(serviceName)) return;
+
+                                    // Regular individual service
+                                    let servicePrice = 0;
+                                    Object.keys(servicesData).forEach(category => {
+                                        const service = servicesData[category].find(s => s.name === serviceName);
+                                        if (service) {
+                                            servicePrice = getServicePrice(service, appointment.pet_size || 'medium');
+                                        }
+                                    });
+
+                                    html += `<div class="flex justify-between items-center py-2">
+                                        <span>${serviceName}</span>
+                                        <span class="font-semibold">₱${servicePrice.toFixed(2)}</span>
+                                    </div>`;
+                                });
+
+                                return html || '<p class="text-gray-500">No services</p>';
                             })()}
                         </div>
                         <div class="border-t-2 border-gold-500/20 pt-4 mt-4">
@@ -2188,6 +2200,22 @@ function viewVaccinationProof(filePath) {
     // Open the vaccination proof in a new tab
     const fullUrl = `../${filePath}`;
     window.open(fullUrl, '_blank');
+}
+
+// Toggle package details visibility
+function togglePackageDetails(packageId) {
+    const details = document.getElementById(`${packageId}-details`);
+    const icon = document.getElementById(`${packageId}-icon`);
+
+    if (details && icon) {
+        if (details.classList.contains('hidden')) {
+            details.classList.remove('hidden');
+            icon.classList.add('rotate-180');
+        } else {
+            details.classList.add('hidden');
+            icon.classList.remove('rotate-180');
+        }
+    }
 }
 
 // Logout function

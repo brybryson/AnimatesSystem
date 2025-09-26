@@ -355,21 +355,37 @@ function handleBookAppointment($input) {
             ]);
         }
         
-        // Get service prices and calculate total
-        $serviceNames = $input['services'];
-        $placeholders = str_repeat('?,', count($serviceNames) - 1) . '?';
+        // Process services with their prices (new format: array of {id, price})
+        $services = [];
+        $serviceIds = [];
+        $totalAmount = 0;
+        $totalDuration = 0;
 
-        // Check services2 table since that's what the frontend loads from
-        $stmt = $db->prepare("SELECT id, name, base_price as price, 30 as duration_minutes FROM services2 WHERE name IN ($placeholders) AND status = 'active'");
-        $stmt->execute($serviceNames);
-        $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($input['services'] as $serviceData) {
+            if (!isset($serviceData['id']) || !isset($serviceData['price'])) {
+                throw new Exception('Invalid service data format');
+            }
 
-        if (count($services) !== count($serviceNames)) {
-            throw new Exception('Some selected services are not available');
+            // Get service details from database
+            $stmt = $db->prepare("SELECT id, name, 30 as duration_minutes FROM services2 WHERE id = ? AND status = 'active'");
+            $stmt->execute([$serviceData['id']]);
+            $serviceInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$serviceInfo) {
+                throw new Exception('Service not found: ' . $serviceData['id']);
+            }
+
+            $services[] = [
+                'id' => $serviceInfo['id'],
+                'name' => $serviceInfo['name'],
+                'price' => $serviceData['price'],
+                'duration_minutes' => $serviceInfo['duration_minutes']
+            ];
+
+            $serviceIds[] = $serviceInfo['id'];
+            $totalAmount += $serviceData['price'];
+            $totalDuration += $serviceInfo['duration_minutes'];
         }
-        
-        $totalAmount = array_sum(array_column($services, 'price'));
-        $totalDuration = array_sum(array_column($services, 'duration_minutes'));
         
         // Create appointment
         $stmt = $db->prepare("
@@ -550,15 +566,15 @@ function handleUpdateAppointment($input) {
 
 function handleGetAppointmentDetails() {
     $decoded = requireAuth();
-    
+
     try {
         if (!isset($_GET['appointment_id']) || empty($_GET['appointment_id'])) {
             throw new Exception('Appointment ID is required');
         }
-        
+
         $appointmentId = intval($_GET['appointment_id']);
         $db = getDB();
-        
+
         // Get appointment details
         $stmt = $db->prepare("SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
                               a.total_amount, a.status, a.special_instructions, a.package_customizations,
@@ -570,24 +586,79 @@ function handleGetAppointmentDetails() {
                               WHERE a.id = ? AND a.user_id = ?");
         $stmt->execute([$appointmentId, $decoded->user_id]);
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$appointment) {
             throw new Exception('Appointment not found or you do not have permission to view it');
         }
-        
+
         // Get services for the appointment
         $stmt = $db->prepare("SELECT s.id, s.name, s.category, aps.price
                              FROM appointment_services aps
                              JOIN services2 s ON aps.service_id = s.id
                              WHERE aps.appointment_id = ?");
         $stmt->execute([$appointmentId]);
-        $appointment['services'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+        $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Process package customizations if they exist
+        $processedServices = [];
+        $packageCustomizations = json_decode($appointment['package_customizations'], true);
+
+        if ($packageCustomizations && is_array($packageCustomizations)) {
+            // Group services by packages
+            $packageServices = [];
+            $individualServices = [];
+
+            foreach ($services as $service) {
+                $isPartOfPackage = false;
+
+                // Check if this service belongs to any package
+                foreach ($packageCustomizations as $packageId => $customization) {
+                    if (isset($customization['includedServices']) &&
+                        in_array($service['name'], $customization['includedServices'])) {
+                        // Use packageName if available, otherwise use packageId
+                        $packageName = $customization['packageName'] ?? $packageId;
+                        if (!isset($packageServices[$packageName])) {
+                            $packageServices[$packageName] = [
+                                'name' => $packageName . (isset($customization['excludedServices']) && !empty($customization['excludedServices']) ? ' (Customized)' : ''),
+                                'services' => [],
+                                'price' => 0,
+                                'isPackage' => true
+                            ];
+                        }
+                        $packageServices[$packageName]['services'][] = [
+                            'name' => $service['name'],
+                            'price' => $service['price'],
+                            'included' => !isset($customization['excludedServices']) ||
+                                        !in_array($service['name'], $customization['excludedServices'])
+                        ];
+                        $packageServices[$packageName]['price'] += $service['price'];
+                        $isPartOfPackage = true;
+                        break;
+                    }
+                }
+
+                if (!$isPartOfPackage) {
+                    $individualServices[] = $service;
+                }
+            }
+
+            // Add packages first, then individual services
+            foreach ($packageServices as $package) {
+                $processedServices[] = $package;
+            }
+            $processedServices = array_merge($processedServices, $individualServices);
+        } else {
+            // No package customizations, return services as-is
+            $processedServices = $services;
+        }
+
+        $appointment['services'] = $processedServices;
+
         echo json_encode([
             'success' => true,
             'appointment' => $appointment
         ]);
-        
+
     } catch(Exception $e) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);

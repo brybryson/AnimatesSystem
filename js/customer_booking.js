@@ -119,32 +119,11 @@ async function handleAppointmentSubmission(event) {
         return;
     }
 
-    // Get selected services - expand customized packages to individual service names
-    const servicesToSubmit = [];
-    const serviceNameSet = new Set();
-    selectedServices.forEach(service => {
-        if (service.customizations && service.customizations.selected) {
-            // For customized packages, add the included service names
-            const packageName = service.name.replace(' (Customized)', '');
-            const packageItems = packageContents[packageName] || [];
-            const includedServices = packageItems.filter(item =>
-                !service.customizations.excludedServices.includes(item.name)
-            );
-            // Add the service names for included services
-            includedServices.forEach(item => {
-                if (!serviceNameSet.has(item.name)) {
-                    serviceNameSet.add(item.name);
-                    servicesToSubmit.push(item.name);
-                }
-            });
-        } else {
-            // Regular service
-            if (!serviceNameSet.has(service.name)) {
-                serviceNameSet.add(service.name);
-                servicesToSubmit.push(service.name);
-            }
-        }
-    });
+    // Get selected services as array of {id, price} objects
+    const servicesToSubmit = selectedServices.map(service => ({
+        id: service.id,
+        price: service.price
+    }));
 
     if (selectedServices.length === 0) {
         showNotification('Please select at least one service', 'warning');
