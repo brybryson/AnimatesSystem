@@ -67,17 +67,50 @@ try {
     
     // Get services for this booking
     $stmt = $db->prepare("
-        SELECT s.name, s.description, bs.price
+        SELECT s.name, s.description, bs.price, s.category
         FROM booking_services bs
         JOIN services s ON bs.service_id = s.id
         WHERE bs.booking_id = ?
     ");
     $stmt->execute([$booking['booking_id']]);
     $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Get status history
+
+    // Get package customizations for this booking
     $stmt = $db->prepare("
-        SELECT status, notes, created_at
+        SELECT pc.package_name, pc.service_name, pc.included
+        FROM package_customizations pc
+        WHERE pc.booking_id = ?
+        ORDER BY pc.package_name, pc.service_name
+    ");
+    $stmt->execute([$booking['booking_id']]);
+    $packageCustomizations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Group package customizations by package name
+    $groupedPackages = [];
+    foreach ($packageCustomizations as $customization) {
+        $packageName = $customization['package_name'];
+        if (!isset($groupedPackages[$packageName])) {
+            $groupedPackages[$packageName] = [
+                'name' => $packageName,
+                'services' => []
+            ];
+        }
+        $groupedPackages[$packageName]['services'][] = [
+            'name' => $customization['service_name'],
+            'included' => (bool)$customization['included']
+        ];
+    }
+    
+    // Get status history and map old status values to new ones for frontend compatibility
+    $stmt = $db->prepare("
+        SELECT
+            CASE
+                WHEN status = 'bathing' THEN 'in-progress'
+                WHEN status = 'grooming' THEN 'in-progress'
+                WHEN status = 'ready' THEN 'in-progress'
+                ELSE status
+            END as status,
+            notes, created_at
         FROM status_updates
         WHERE booking_id = ?
         ORDER BY created_at ASC
@@ -111,6 +144,7 @@ try {
         
         // Services and history
         'services' => $services,
+        'package_customizations' => array_values($groupedPackages),
         'status_history' => $statusHistory
     ];
     

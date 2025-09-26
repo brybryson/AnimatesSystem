@@ -64,9 +64,13 @@ if ($method === 'GET') {
 
         // Get specific RFID if provided
         $rfid = $_GET['rfid'] ?? '';
+        $action = $_GET['action'] ?? '';
+        $period = $_GET['period'] ?? 'all';
 
         if ($rfid) {
             handleSpecificRFIDTracking($rfid, $userEmail);
+        } elseif ($action === 'history') {
+            handleUserHistory($userEmail, $period);
         } else {
             handleUserBookings($userEmail);
         }
@@ -137,13 +141,39 @@ function handleUserBookings($userEmail) {
 
             // Get status history
             $historyStmt = $db->prepare("
-                SELECT status, created_at 
-                FROM status_updates 
-                WHERE booking_id = ? 
+                SELECT status, created_at
+                FROM status_updates
+                WHERE booking_id = ?
                 ORDER BY created_at ASC
             ");
             $historyStmt->execute([$booking['booking_id']]);
             $statusHistory = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Get package customizations for this booking
+            $packageStmt = $db->prepare("
+                SELECT pc.package_name, pc.service_name, pc.included
+                FROM package_customizations pc
+                WHERE pc.booking_id = ?
+                ORDER BY pc.package_name, pc.service_name
+            ");
+            $packageStmt->execute([$booking['booking_id']]);
+            $packageCustomizations = $packageStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Group package customizations by package name
+            $groupedPackages = [];
+            foreach ($packageCustomizations as $customization) {
+                $packageName = $customization['package_name'];
+                if (!isset($groupedPackages[$packageName])) {
+                    $groupedPackages[$packageName] = [
+                        'name' => $packageName,
+                        'services' => []
+                    ];
+                }
+                $groupedPackages[$packageName]['services'][] = [
+                    'name' => $customization['service_name'],
+                    'included' => (bool)$customization['included']
+                ];
+            }
 
             $processedBookings[] = [
                 'booking_id' => $booking['booking_id'],
@@ -157,6 +187,7 @@ function handleUserBookings($userEmail) {
                 'estimated_completion' => $booking['estimated_completion'],
                 'actual_completion' => $booking['actual_completion'],
                 'services' => $services,
+                'package_customizations' => array_values($groupedPackages),
                 'status_history' => $statusHistory
             ];
         }
@@ -232,13 +263,39 @@ function handleSpecificRFIDTracking($rfid, $userEmail) {
 
         // Get status history
         $historyStmt = $db->prepare("
-            SELECT status, created_at 
-            FROM status_updates 
-            WHERE booking_id = ? 
+            SELECT status, created_at
+            FROM status_updates
+            WHERE booking_id = ?
             ORDER BY created_at ASC
         ");
         $historyStmt->execute([$booking['booking_id']]);
         $statusHistory = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Get package customizations for this booking
+        $packageStmt = $db->prepare("
+            SELECT pc.package_name, pc.service_name, pc.included
+            FROM package_customizations pc
+            WHERE pc.booking_id = ?
+            ORDER BY pc.package_name, pc.service_name
+        ");
+        $packageStmt->execute([$booking['booking_id']]);
+        $packageCustomizations = $packageStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Group package customizations by package name
+        $groupedPackages = [];
+        foreach ($packageCustomizations as $customization) {
+            $packageName = $customization['package_name'];
+            if (!isset($groupedPackages[$packageName])) {
+                $groupedPackages[$packageName] = [
+                    'name' => $packageName,
+                    'services' => []
+                ];
+            }
+            $groupedPackages[$packageName]['services'][] = [
+                'name' => $customization['service_name'],
+                'included' => (bool)$customization['included']
+            ];
+        }
 
         $result = [
             'booking_id' => $booking['booking_id'],
@@ -252,6 +309,7 @@ function handleSpecificRFIDTracking($rfid, $userEmail) {
             'estimated_completion' => $booking['estimated_completion'],
             'actual_completion' => $booking['actual_completion'],
             'services' => $services,
+            'package_customizations' => array_values($groupedPackages),
             'status_history' => $statusHistory
         ];
 
@@ -267,6 +325,101 @@ function handleSpecificRFIDTracking($rfid, $userEmail) {
         echo json_encode([
             'success' => false,
             'error' => 'Error tracking pet'
+        ]);
+        exit;
+    }
+}
+
+function handleUserHistory($userEmail, $period) {
+    try {
+        $db = getDB();
+
+        // Build date filter based on period
+        $dateFilter = "";
+        switch ($period) {
+            case 'month':
+                $dateFilter = "AND b.actual_completion >= DATE_SUB(NOW(), INTERVAL 1 MONTH)";
+                break;
+            case 'year':
+                $dateFilter = "AND b.actual_completion >= DATE_SUB(NOW(), INTERVAL 1 YEAR)";
+                break;
+            case 'all':
+            default:
+                // No date filter for 'all'
+                break;
+        }
+
+        // Get completed bookings for the logged-in user
+        $stmt = $db->prepare("
+            SELECT
+                b.id as booking_id,
+                b.custom_rfid as tag_id,
+                b.status,
+                b.total_amount,
+                b.check_in_time,
+                b.estimated_completion,
+                b.actual_completion,
+                p.name as pet_name,
+                p.breed,
+                c.name as owner_name,
+                GROUP_CONCAT(CONCAT(s.name, '|', bs.price) SEPARATOR '|||') as services
+            FROM bookings b
+            JOIN pets p ON b.pet_id = p.id
+            JOIN customers c ON p.customer_id = c.id
+            LEFT JOIN booking_services bs ON b.id = bs.booking_id
+            LEFT JOIN services s ON bs.service_id = s.id
+            WHERE c.email = ?
+            AND b.status = 'completed'
+            {$dateFilter}
+            GROUP BY b.id
+            ORDER BY b.actual_completion DESC
+        ");
+        $stmt->execute([$userEmail]);
+        $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $processedBookings = [];
+        foreach ($bookings as $booking) {
+            $services = [];
+            if ($booking['services']) {
+                $serviceData = explode('|||', $booking['services']);
+                foreach ($serviceData as $service) {
+                    $parts = explode('|', $service);
+                    if (count($parts) == 2) {
+                        $services[] = [
+                            'name' => $parts[0],
+                            'price' => $parts[1]
+                        ];
+                    }
+                }
+            }
+
+            $processedBookings[] = [
+                'booking_id' => $booking['booking_id'],
+                'tag_id' => $booking['tag_id'],
+                'pet_name' => $booking['pet_name'],
+                'breed' => $booking['breed'],
+                'owner_name' => $booking['owner_name'],
+                'status' => $booking['status'],
+                'total_amount' => $booking['total_amount'],
+                'check_in_time' => $booking['check_in_time'],
+                'estimated_completion' => $booking['estimated_completion'],
+                'actual_completion' => $booking['actual_completion'],
+                'services' => $services
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'data' => $processedBookings
+        ]);
+        exit;
+
+    } catch (Exception $e) {
+        error_log("Error loading user history: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Error loading history data'
         ]);
         exit;
     }

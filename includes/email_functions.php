@@ -6,6 +6,33 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 /**
+ * Helper function to format package services HTML
+ */
+function getPackageServicesHTML($packageServicesString) {
+    $packageServices = explode('; ', $packageServicesString);
+    $result = '';
+    $currentPackage = '';
+    foreach ($packageServices as $service) {
+        if (strpos($service, ': ') !== false) {
+            list($package, $serviceName) = explode(': ', $service, 2);
+            if ($package !== $currentPackage) {
+                if ($currentPackage !== '') {
+                    $result .= "</div>";
+                }
+                $result .= "<div style='margin-bottom: 5px;'><strong>{$package}:</strong> {$serviceName}";
+                $currentPackage = $package;
+            } else {
+                $result .= ", {$serviceName}";
+            }
+        }
+    }
+    if ($currentPackage !== '') {
+        $result .= "</div>";
+    }
+    return $result;
+}
+
+/**
  * Test SMTP configuration without sending an actual email
  */
 function testEmailConfig() {
@@ -52,7 +79,7 @@ function sendBookingConfirmationEmail($bookingId) {
         
         // Get booking details with all required information
         $stmt = $db->prepare("
-            SELECT 
+            SELECT
                 b.id as booking_id,
                 b.custom_rfid,
                 b.total_amount,
@@ -63,12 +90,20 @@ function sendBookingConfirmationEmail($bookingId) {
                 c.name as owner_name,
                 c.phone as owner_phone,
                 c.email as owner_email,
-                GROUP_CONCAT(s.name SEPARATOR ', ') as services
+                GROUP_CONCAT(DISTINCT s.name SEPARATOR ', ') as services,
+                GROUP_CONCAT(DISTINCT
+                    CASE
+                        WHEN pc.included = 1 THEN CONCAT(pc.package_name, ': ', pc.service_name)
+                        ELSE NULL
+                    END
+                    SEPARATOR '; '
+                ) as package_services
             FROM bookings b
             JOIN pets p ON b.pet_id = p.id
             JOIN customers c ON p.customer_id = c.id
             LEFT JOIN booking_services bs ON b.id = bs.booking_id
             LEFT JOIN services s ON bs.service_id = s.id
+            LEFT JOIN package_customizations pc ON b.id = pc.booking_id AND pc.included = 1
             WHERE b.id = ?
             GROUP BY b.id
         ");
@@ -122,7 +157,7 @@ function sendBookingStatusEmailFromRFID($bookingId, $tapCount) {
         
         // Get booking details with all required information
         $stmt = $db->prepare("
-            SELECT 
+            SELECT
                 b.id as booking_id,
                 b.custom_rfid,
                 b.total_amount,
@@ -134,12 +169,20 @@ function sendBookingStatusEmailFromRFID($bookingId, $tapCount) {
                 c.name as owner_name,
                 c.phone as owner_phone,
                 c.email as owner_email,
-                GROUP_CONCAT(s.name SEPARATOR ', ') as services
+                GROUP_CONCAT(DISTINCT s.name SEPARATOR ', ') as services,
+                GROUP_CONCAT(DISTINCT
+                    CASE
+                        WHEN pc.included = 1 THEN CONCAT(pc.package_name, ': ', pc.service_name)
+                        ELSE NULL
+                    END
+                    SEPARATOR '; '
+                ) as package_services
             FROM bookings b
             JOIN pets p ON b.pet_id = p.id
             JOIN customers c ON p.customer_id = c.id
             LEFT JOIN booking_services bs ON b.id = bs.booking_id
             LEFT JOIN services s ON bs.service_id = s.id
+            LEFT JOIN package_customizations pc ON b.id = pc.booking_id AND pc.included = 1
             WHERE b.id = ?
             GROUP BY b.id
         ");
@@ -195,7 +238,7 @@ function sendBookingStatusEmail($bookingId) {
         
         // Get booking details with all required information
         $stmt = $db->prepare("
-    SELECT 
+    SELECT
         b.id as booking_id,
         b.custom_rfid,
         b.total_amount,
@@ -207,12 +250,20 @@ function sendBookingStatusEmail($bookingId) {
         c.name as owner_name,
         c.phone as owner_phone,
         c.email as owner_email,
-        GROUP_CONCAT(DISTINCT s.name SEPARATOR ', ') as services
+        GROUP_CONCAT(DISTINCT s.name SEPARATOR ', ') as services,
+        GROUP_CONCAT(DISTINCT
+            CASE
+                WHEN pc.included = 1 THEN CONCAT(pc.package_name, ': ', pc.service_name)
+                ELSE NULL
+            END
+            SEPARATOR '; '
+        ) as package_services
     FROM bookings b
     JOIN pets p ON b.pet_id = p.id
     JOIN customers c ON p.customer_id = c.id
     LEFT JOIN booking_services bs ON b.id = bs.booking_id
     LEFT JOIN services s ON bs.service_id = s.id
+    LEFT JOIN package_customizations pc ON b.id = pc.booking_id AND pc.included = 1
     WHERE b.id = ?
     GROUP BY b.id
 ");
@@ -246,8 +297,9 @@ $status = $booking['current_status'];
         $mail->addAddress($booking['owner_email'], $booking['owner_name']);
         
         $mail->isHTML(true);
-        $mail->Subject = "Pet Grooming Update - {$booking['pet_name']} is {$status}";
-        $mail->Body = getBookingStatusEmailTemplate($booking, $status);
+        $friendlyMessage = getFriendlyStatusMessage($status, $booking['pet_name']);
+        $mail->Subject = "Pet Grooming Update - {$friendlyMessage}";
+        $mail->Body = getBookingStatusEmailTemplate($booking, $status, $friendlyMessage);
         
         error_log("Email: Attempting to send email to: " . $booking['owner_email']);
         $mail->send();
@@ -267,11 +319,28 @@ $status = $booking['current_status'];
 function getStatusFromTapCount($tapCount) {
     switch($tapCount) {
         case 1: return 'checked-in';
-        case 2: return 'bathing';
-        case 3: return 'grooming';
-        case 4: return 'ready for pickup';
-        case 5: return 'completed';
+        case 2: return 'in-progress';
+        case 3: return 'completed';
         default: return 'unknown';
+    }
+}
+
+/**
+ * Get friendly status message for emails
+ */
+function getFriendlyStatusMessage($status, $petName) {
+    switch($status) {
+        case 'checked-in':
+            return "$petName has been checked in and is getting settled in!";
+        case 'bathing':
+        case 'grooming':
+        case 'ready':
+        case 'in-progress':
+            return "$petName is enjoying grooming time.";
+        case 'completed':
+            return "$petName just finished a fresh grooming session and is ready to go home!";
+        default:
+            return "$petName's status has been updated.";
     }
 }
 
@@ -286,12 +355,44 @@ function getBookingConfirmationEmailTemplate($booking) {
     }
     
     $servicesSection = '';
-    if ($booking['services']) {
+    if ($booking['services'] || $booking['package_services']) {
         $servicesSection = "
                 <div class='services-list'>
-                    <div class='info-label'>Services Selected</div>
-                    <div class='info-value'>{$booking['services']}</div>
-                    <div style='font-size: 14px; color: #666; margin-top: 5px;'>Total: ₱" . number_format($booking['total_amount'], 2) . "</div>
+                    <div class='info-label'>Services Selected</div>";
+
+        // Display regular services
+        if ($booking['services']) {
+            $servicesSection .= "<div class='info-value'>{$booking['services']}</div>";
+        }
+
+        // Display package services
+        if ($booking['package_services']) {
+            $packageServices = explode('; ', $booking['package_services']);
+            $servicesSection .= "<div style='margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;'>";
+            $servicesSection .= "<div style='font-size: 14px; color: #666; font-weight: bold; margin-bottom: 5px;'>Package Services:</div>";
+
+            $currentPackage = '';
+            foreach ($packageServices as $service) {
+                if (strpos($service, ': ') !== false) {
+                    list($package, $serviceName) = explode(': ', $service, 2);
+                    if ($package !== $currentPackage) {
+                        if ($currentPackage !== '') {
+                            $servicesSection .= "</div>";
+                        }
+                        $servicesSection .= "<div style='margin-bottom: 5px;'><strong>{$package}:</strong> {$serviceName}";
+                        $currentPackage = $package;
+                    } else {
+                        $servicesSection .= ", {$serviceName}";
+                    }
+                }
+            }
+            if ($currentPackage !== '') {
+                $servicesSection .= "</div>";
+            }
+            $servicesSection .= "</div>";
+        }
+
+        $servicesSection .= "<div style='font-size: 14px; color: #666; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;'>Total: ₱" . number_format($booking['total_amount'], 2) . "</div>
                 </div>";
     }
     
@@ -377,19 +478,17 @@ function getBookingConfirmationEmailTemplate($booking) {
 /**
  * Email template for booking status updates
  */
-function getBookingStatusEmailTemplate($booking, $status) {
+function getBookingStatusEmailTemplate($booking, $status, $friendlyMessage = null) {
     $statusEmoji = [
         'checked-in' => '✅',
-        'bathing' => '🛁',
-        'grooming' => '✂️',
-        'ready for pickup' => '🎉'
+        'in-progress' => '🔄',
+        'completed' => '🎉'
     ];
-    
+
     $statusColors = [
         'checked-in' => '#3B82F6',
-        'bathing' => '#06B6D4',
-        'grooming' => '#8B5CF6',
-        'ready for pickup' => '#10B981'
+        'in-progress' => '#D4AF37',
+        'completed' => '#10B981'
     ];
     
     $currentEmoji = $statusEmoji[$status] ?? '📋';
@@ -402,12 +501,44 @@ function getBookingStatusEmailTemplate($booking, $status) {
     }
     
     $servicesSection = '';
-    if ($booking['services']) {
+    if ($booking['services'] || $booking['package_services']) {
         $servicesSection = "
                 <div class='services-list'>
-                    <div class='info-label'>Services Selected</div>
-                    <div class='info-value'>{$booking['services']}</div>
-                    <div style='font-size: 14px; color: #666; margin-top: 5px;'>Total: ₱" . number_format($booking['total_amount'], 2) . "</div>
+                    <div class='info-label'>Services Selected</div>";
+
+        // Display regular services
+        if ($booking['services']) {
+            $servicesSection .= "<div class='info-value'>{$booking['services']}</div>";
+        }
+
+        // Display package services
+        if ($booking['package_services']) {
+            $packageServices = explode('; ', $booking['package_services']);
+            $servicesSection .= "<div style='margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;'>";
+            $servicesSection .= "<div style='font-size: 14px; color: #666; font-weight: bold; margin-bottom: 5px;'>Package Services:</div>";
+
+            $currentPackage = '';
+            foreach ($packageServices as $service) {
+                if (strpos($service, ': ') !== false) {
+                    list($package, $serviceName) = explode(': ', $service, 2);
+                    if ($package !== $currentPackage) {
+                        if ($currentPackage !== '') {
+                            $servicesSection .= "</div>";
+                        }
+                        $servicesSection .= "<div style='margin-bottom: 5px;'><strong>{$package}:</strong> {$serviceName}";
+                        $currentPackage = $package;
+                    } else {
+                        $servicesSection .= ", {$serviceName}";
+                    }
+                }
+            }
+            if ($currentPackage !== '') {
+                $servicesSection .= "</div>";
+            }
+            $servicesSection .= "</div>";
+        }
+
+        $servicesSection .= "<div style='font-size: 14px; color: #666; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;'>Total: ₱" . number_format($booking['total_amount'], 2) . "</div>
                 </div>";
     }
     
@@ -478,7 +609,7 @@ function getBookingStatusEmailTemplate($booking, $status) {
             <div class='content'>
                 <p style='font-size: 18px; margin-bottom: 25px;'>Hello {$booking['owner_name']},</p>
                 
-                <p>We wanted to update you on {$booking['pet_name']}'s grooming progress at Animates PH - Camaro Branch!</p>
+                <p>" . ($friendlyMessage ?: "We wanted to update you on {$booking['pet_name']}'s grooming progress at Animates PH - Camaro Branch!") . "</p>
                 
                 <div class='info-grid'>
                     <div class='info-item'>
@@ -508,8 +639,7 @@ function getBookingStatusEmailTemplate($booking, $status) {
                     </div>
                     <div class='progress-labels'>
                         <div class='progress-label'>Check-in</div>
-                        <div class='progress-label'>Bathing</div>
-                        <div class='progress-label'>Grooming</div>
+                        <div class='progress-label'>Services</div>
                         <div class='progress-label'>Ready</div>
                     </div>
                 </div>
@@ -541,23 +671,20 @@ function getBookingStatusEmailTemplate($booking, $status) {
 function getBookingStatusEmailTemplateRFID($booking, $status, $tapCount) {
     $statusEmoji = [
         'checked-in' => '✅',
-        'bathing' => '🛁',
-        'grooming' => '✂️',
-        'ready' => '🎉'
+        'in-progress' => '🔄',
+        'completed' => '🎉'
     ];
-    
+
     $statusColors = [
         'checked-in' => '#3B82F6',
-        'bathing' => '#06B6D4',
-        'grooming' => '#8B5CF6',
-        'ready' => '#10B981'
+        'in-progress' => '#D4AF37',
+        'completed' => '#10B981'
     ];
-    
+
     $statusDescriptions = [
         'checked-in' => 'Your pet has been checked in and is waiting for services',
-        'bathing' => 'Your pet is currently being bathed and pampered',
-        'grooming' => 'Professional grooming services in progress',
-        'ready' => 'Your pet is ready! Please come for pickup'
+        'in-progress' => 'Professional grooming services are in progress',
+        'completed' => 'Your pet is ready! Please come for pickup'
     ];
     
     $currentEmoji = $statusEmoji[$status] ?? '📋';
@@ -623,23 +750,28 @@ function getBookingStatusEmailTemplateRFID($booking, $status, $tapCount) {
                     </div>
                 </div>
                 
-                " . ($booking['services'] ? "
+                " . (($booking['services'] || $booking['package_services']) ? "
                 <div class='services-list'>
                     <div class='info-label'>Services Selected</div>
-                    <div class='info-value'>{$booking['services']}</div>
-                    <div style='font-size: 14px; color: #666; margin-top: 5px;'>Total: ₱" . number_format($booking['total_amount'], 2) . "</div>
+                    " . ($booking['services'] ? "<div class='info-value'>{$booking['services']}</div>" : "") . "
+                    " . ($booking['package_services'] ? "
+                    <div style='margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;'>
+                        <div style='font-size: 14px; color: #666; font-weight: bold; margin-bottom: 5px;'>Package Services:</div>
+                        " . getPackageServicesHTML($booking['package_services']) . "
+                    </div>
+                    " : "") . "
+                    <div style='font-size: 14px; color: #666; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;'>Total: ₱" . number_format($booking['total_amount'], 2) . "</div>
                 </div>
                 " : "") . "
                 
                 <div style='margin: 25px 0;'>
                     <div style='font-size: 16px; font-weight: bold; margin-bottom: 10px;'>🚀 Grooming Progress</div>
                     <div class='progress-bar'>
-                        <div class='progress-fill' style='width: " . ($tapCount * 25) . "%;'></div>
+                        <div class='progress-fill' style='width: " . ($tapCount * 33) . "%;'></div>
                     </div>
                     <div style='display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-top: 8px;'>
                         <span>Check-in</span>
-                        <span>Bathing</span>
-                        <span>Grooming</span>
+                        <span>Services</span>
                         <span>Ready</span>
                     </div>
                 </div>
@@ -677,13 +809,11 @@ function getBookingStatusEmailTemplateRFID($booking, $status, $tapCount) {
  */
 function getProgressPercentage($status) {
     $progressMap = [
-        'checked-in' => 25,
-        'bathing' => 50,
-        'grooming' => 75,
-        'ready for pickup' => 100,
+        'checked-in' => 33,
+        'in-progress' => 66,
         'completed' => 100
     ];
-    
+
     return $progressMap[$status] ?? 0;
 }
 
@@ -695,13 +825,13 @@ function getProgressPercentage($status) {
 function sendCompletionEmail($bookingId) {
     try {
         error_log("Email: Starting sendCompletionEmail for booking ID: $bookingId");
-        
+
         $db = getDB();
         error_log("Email: Database connection successful for completion email");
-        
+
         // Get booking details with all required information
         $stmt = $db->prepare("
-            SELECT 
+            SELECT
                 b.id as booking_id,
                 b.custom_rfid,
                 b.total_amount,
@@ -727,10 +857,20 @@ function sendCompletionEmail($bookingId) {
         $stmt->execute([$bookingId]);
         $booking = $stmt->fetch(PDO::FETCH_ASSOC);
         error_log("Email: Completion email - Booking data retrieved: " . json_encode($booking));
-        
-        if (!$booking || !$booking['owner_email']) {
-            error_log("Email: Completion email - No booking found or no email address for booking ID: $bookingId");
-            throw new Exception('Booking not found or no email address');
+
+        if (!$booking) {
+            error_log("Email: Completion email - No booking found for booking ID: $bookingId");
+            return false;
+        }
+
+        if (!$booking['owner_email']) {
+            error_log("Email: Completion email - No email address found for booking ID: $bookingId");
+            return false;
+        }
+
+        if ($booking['status'] !== 'completed') {
+            error_log("Email: Completion email - Booking status is not 'completed' for booking ID: $bookingId, status: " . $booking['status']);
+            return false;
         }
         
         // Send email

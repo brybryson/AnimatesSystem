@@ -132,6 +132,25 @@
             }
         }
 
+        // Validation functions
+        function validatePhoneNumber(phone) {
+            // Must start with "09", exactly 11 digits, no letters
+            const phoneRegex = /^09\d{9}$/;
+            return phoneRegex.test(phone);
+        }
+
+        function validateName(name) {
+            // No numbers, no special characters (only letters and spaces)
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            return nameRegex.test(name) && name.trim().length > 0;
+        }
+
+        function validateEmail(email) {
+            // Must contain "@" and end with ".com"
+            const emailRegex = /^[^\s@]+@[^\s@]+\.com$/;
+            return emailRegex.test(email);
+        }
+
         function validateSignupForm() {
             const requiredFields = ['firstName', 'lastName', 'signupEmail', 'signupPhone', 'signupAddress', 'signupPassword', 'confirmPassword'];
             const allFilled = requiredFields.every(field => document.getElementById(field).value.trim());
@@ -139,8 +158,18 @@
             const passwordsMatch = checkPasswordMatch();
             const { strength } = checkPasswordStrength(document.getElementById('signupPassword').value);
 
+            // Additional validations
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const email = document.getElementById('signupEmail').value.trim();
+            const phone = document.getElementById('signupPhone').value.trim();
+
+            const nameValid = validateName(firstName) && validateName(lastName);
+            const emailValid = validateEmail(email);
+            const phoneValid = validatePhoneNumber(phone);
+
             const signupBtn = document.getElementById('signupBtn');
-            const isValid = allFilled && termsChecked && passwordsMatch && strength >= 3; // Require strong password
+            const isValid = allFilled && termsChecked && passwordsMatch && strength >= 3 && nameValid && emailValid && phoneValid;
 
             if (isValid) {
                 signupBtn.disabled = false;
@@ -298,12 +327,12 @@
                     // Redirect based on user role
                     setTimeout(() => {
                         if (result.user.role === 'customer') {
-                            window.location.href = 'customer_portal.html';
+                            window.location.href = 'customer_tracking.html';
                         } else if (result.user.role === 'admin' || result.user.role === 'staff' || result.user.role === 'cashier') {
                             window.location.href = 'dashboard.html';
                         } else {
-                            // Fallback to customer portal for unknown roles
-                            window.location.href = 'customer_portal.html';
+                            // Fallback to customer tracking for unknown roles
+                            window.location.href = 'customer_tracking.html';
                         }
                     }, 2000);
                 } else {
@@ -317,7 +346,18 @@
 
         async function handleSignup(e) {
     e.preventDefault();
-    
+
+    // Validate all fields before submission
+    const firstNameValid = validateFirstName();
+    const lastNameValid = validateLastName();
+    const emailValid = validateSignupEmail();
+    const phoneValid = validateSignupPhone();
+
+    if (!firstNameValid || !lastNameValid || !emailValid || !phoneValid) {
+        showNotification('Please correct the validation errors before submitting.', 'error');
+        return;
+    }
+
     const formData = {
         firstName: document.getElementById('firstName').value,
         lastName: document.getElementById('lastName').value,
@@ -327,10 +367,10 @@
         password: document.getElementById('signupPassword').value,
         // marketingEmails: document.getElementById('marketingEmails').checked
     };
-    
+
     try {
         showNotification('Creating your account...', 'info');
-        
+
         const response = await fetch(`${API_BASE}auth.php`, {
             method: 'POST',
             headers: {
@@ -349,9 +389,9 @@
             console.error('Server responded with an error:', errorText);
             return; // Stop execution
         }
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             verificationToken = result.verification_token;
             document.getElementById('verificationEmail').textContent = formData.email;
@@ -597,18 +637,28 @@ async function resendResetCode() {
             }
         }
 
-        // Phone number formatting
+        // Phone number formatting and validation
         function formatPhoneNumber(input) {
+            // Remove all non-numeric characters
             let value = input.value.replace(/\D/g, '');
+
+            // Ensure it starts with 09 and limit to 11 digits
             if (value.length > 0) {
+                if (!value.startsWith('09')) {
+                    value = '09' + value.replace(/^09/, '');
+                }
+                value = value.substring(0, 11); // Limit to 11 digits
+
+                // Format as 09XX-XXX-XXXX
                 if (value.length <= 4) {
-                    value = value;
+                    // Just show the beginning
                 } else if (value.length <= 7) {
                     value = value.slice(0, 4) + '-' + value.slice(4);
                 } else {
                     value = value.slice(0, 4) + '-' + value.slice(4, 7) + '-' + value.slice(7, 11);
                 }
             }
+
             input.value = value;
         }
 
@@ -706,6 +756,55 @@ async function resendResetCode() {
             }, 4000);
         }
 
+        // Real-time field validation functions
+        function validateField(fieldId, validator, errorMessage) {
+            const field = document.getElementById(fieldId);
+            const value = field.value.trim();
+            let errorElement = document.getElementById(fieldId + 'Error');
+
+            // Create error element if it doesn't exist
+            if (!errorElement) {
+                errorElement = document.createElement('p');
+                errorElement.id = fieldId + 'Error';
+                errorElement.className = 'text-xs text-red-600 mt-1';
+                field.parentNode.appendChild(errorElement);
+            }
+
+            if (value === '') {
+                errorElement.textContent = '';
+                field.classList.remove('border-red-500', 'border-green-500');
+                return false;
+            }
+
+            if (validator(value)) {
+                errorElement.textContent = '';
+                field.classList.remove('border-red-500');
+                field.classList.add('border-green-500');
+                return true;
+            } else {
+                errorElement.textContent = errorMessage;
+                field.classList.remove('border-green-500');
+                field.classList.add('border-red-500');
+                return false;
+            }
+        }
+
+        function validateFirstName() {
+            return validateField('firstName', validateName, 'First name can only contain letters and spaces');
+        }
+
+        function validateLastName() {
+            return validateField('lastName', validateName, 'Last name can only contain letters and spaces');
+        }
+
+        function validateSignupEmail() {
+            return validateField('signupEmail', validateEmail, 'Email must contain "@" and end with ".com"');
+        }
+
+        function validateSignupPhone() {
+            return validateField('signupPhone', validatePhoneNumber, 'Phone number must start with "09" and be exactly 11 digits');
+        }
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
             // Check URL parameters
@@ -729,8 +828,8 @@ async function resendResetCode() {
                     .then(response => response.json())
                     .then(result => {
                         if (result.success) {
-                            // Redirect to customer portal if token is valid
-                            window.location.href = 'customer_portal.html';
+                            // Redirect to customer tracking if token is valid
+                            window.location.href = 'customer_tracking.html';
                         } else {
                             // Remove invalid token
                             localStorage.removeItem('authToken');
@@ -751,7 +850,7 @@ async function resendResetCode() {
                 // Show success message for newly verified users
                 showNotification('Account verified successfully! Please sign in with your credentials.', 'success');
             }
-            
+
             // Set up form event listeners
             document.getElementById('loginForm').addEventListener('submit', handleLogin);
             document.getElementById('signupForm').addEventListener('submit', handleSignup);
@@ -762,19 +861,18 @@ async function resendResetCode() {
 
             // Set up reset code inputs
             setupResetCodeInputs();
-            
+
             // Set up verification code inputs
             setupVerificationInputs();
-            
 
-                        
+
             // Set up password validation
             document.getElementById('signupPassword').addEventListener('input', function() {
                 updatePasswordStrength();
                 validateSignupForm();
             });
 
-            
+
             document.getElementById('confirmPassword').addEventListener('input', function() {
                 checkPasswordMatch();
                 validateSignupForm();
@@ -790,21 +888,114 @@ async function resendResetCode() {
                 checkNewPasswordMatch();
                 validateNewPasswordForm();
             });
-            
-            // Set up other form validation
-            ['firstName', 'lastName', 'signupEmail', 'signupPhone', 'signupAddress'].forEach(fieldId => {
-                document.getElementById(fieldId).addEventListener('input', validateSignupForm);
+
+            // Set up field validation with real-time feedback
+            document.getElementById('firstName').addEventListener('input', function() {
+                // Remove any numbers or special characters
+                this.value = this.value.replace(/[^a-zA-Z\s]/g, '');
+                validateFirstName();
+                validateSignupForm();
             });
-            
+
+            document.getElementById('firstName').addEventListener('keydown', function(e) {
+                // Allow backspace, delete, tab, escape, enter, space, and arrow keys
+                if ([8, 9, 27, 13, 32, 37, 38, 39, 40].includes(e.keyCode) ||
+                    // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z
+                    (e.ctrlKey && [65, 67, 86, 88, 90].includes(e.keyCode))) {
+                    return;
+                }
+
+                // Only allow letters
+                if (!/[a-zA-Z]/.test(e.key)) {
+                    e.preventDefault();
+                }
+            });
+
+            document.getElementById('lastName').addEventListener('input', function() {
+                // Remove any numbers or special characters
+                this.value = this.value.replace(/[^a-zA-Z\s]/g, '');
+                validateLastName();
+                validateSignupForm();
+            });
+
+            document.getElementById('lastName').addEventListener('keydown', function(e) {
+                // Allow backspace, delete, tab, escape, enter, space, and arrow keys
+                if ([8, 9, 27, 13, 32, 37, 38, 39, 40].includes(e.keyCode) ||
+                    // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z
+                    (e.ctrlKey && [65, 67, 86, 88, 90].includes(e.keyCode))) {
+                    return;
+                }
+
+                // Only allow letters
+                if (!/[a-zA-Z]/.test(e.key)) {
+                    e.preventDefault();
+                }
+            });
+
+            document.getElementById('signupEmail').addEventListener('input', function() {
+                // Remove spaces
+                this.value = this.value.replace(/\s/g, '');
+                validateSignupEmail();
+                validateSignupForm();
+            });
+
+            document.getElementById('signupEmail').addEventListener('keydown', function(e) {
+                // Allow backspace, delete, tab, escape, enter, and arrow keys
+                if ([8, 9, 27, 13, 37, 38, 39, 40].includes(e.keyCode) ||
+                    // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z
+                    (e.ctrlKey && [65, 67, 86, 88, 90].includes(e.keyCode))) {
+                    return;
+                }
+
+                // Prevent spaces
+                if (e.key === ' ') {
+                    e.preventDefault();
+                }
+            });
+
+            document.getElementById('signupPhone').addEventListener('input', function() {
+                // Auto-format phone number
+                formatPhoneNumber(this);
+                validateSignupPhone();
+                validateSignupForm();
+            });
+
+            document.getElementById('signupPhone').addEventListener('keydown', function(e) {
+                // Allow backspace, delete, tab, escape, enter, and arrow keys
+                if ([8, 9, 27, 13, 37, 38, 39, 40].includes(e.keyCode) ||
+                    // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z
+                    (e.ctrlKey && [65, 67, 86, 88, 90].includes(e.keyCode))) {
+                    return;
+                }
+
+                // Prevent input if it would make the phone number invalid
+                const currentValue = this.value;
+                const selectionStart = this.selectionStart;
+                const selectionEnd = this.selectionEnd;
+
+                // If trying to delete the "09" prefix, prevent it
+                if ((selectionStart <= 2 || selectionEnd <= 2) && (e.keyCode === 8 || e.keyCode === 46)) {
+                    e.preventDefault();
+                    return;
+                }
+
+                // Only allow numeric input
+                if (!/[0-9]/.test(e.key)) {
+                    e.preventDefault();
+                }
+            });
+
+            document.getElementById('signupAddress').addEventListener('input', validateSignupForm);
+
             document.getElementById('agreeTerms').addEventListener('change', validateSignupForm);
-            
+
             // Show login form by default
             showLoginForm();
-            
+
             // Check URL parameters for special actions
             const urlParams = new URLSearchParams(window.location.search);
             const action = urlParams.get('action');
-            
+
             if (action === 'signup') {
                 showSignupForm();
             } else if (action === 'forgot') {

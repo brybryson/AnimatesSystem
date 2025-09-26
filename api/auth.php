@@ -161,6 +161,47 @@ function handleDeactivateUser($input) {
         exit;
     }
 }
+
+function handleGetProfile() {
+    try {
+        $token = getBearerToken();
+        if (!$token) {
+            throw new Exception('No token provided');
+        }
+
+        $decoded = verifyJWT($token);
+        $db = getDB();
+
+        // Get user profile information
+        $stmt = $db->prepare("SELECT id, full_name, email, phone, role, username FROM users WHERE id = ? AND email = ? AND is_active = 1");
+        $stmt->execute([$decoded->user_id, $decoded->email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            throw new Exception('User not found');
+        }
+
+        echo json_encode([
+            'success' => true,
+            'user' => [
+                'name' => $user['full_name'],
+                'email' => $user['email'],
+                'phone' => $user['phone'],
+                'role' => $user['role'],
+                'username' => $user['username']
+            ]
+        ]);
+        exit;
+
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+        exit;
+    }
+}
 // Always return JSON
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -278,6 +319,9 @@ if ($method === 'POST') {
             break;
         case 'deactivate_user':
             handleDeactivateUser($input);
+            break;
+        case 'get_profile':
+            handleGetProfile();
             break;
         default:
             http_response_code(400);
@@ -577,10 +621,10 @@ function handleForgotPassword($input) {
         
         $email = trim($input['email']);
         
-        $stmt = $db->prepare("SELECT id, first_name FROM users WHERE email = ? AND email_verified = 1");
+        $stmt = $db->prepare("SELECT id, full_name FROM users WHERE email = ? AND email_verified = 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$user) {
             echo json_encode([
                 'success' => true,
@@ -588,19 +632,21 @@ function handleForgotPassword($input) {
             ]);
             exit;
         }
-        
+
         $resetCode = sprintf('%06d', mt_rand(0, 999999));
         $resetToken = bin2hex(random_bytes(32));
         $resetExpires = date('Y-m-d H:i:s', strtotime('+30 minutes'));
-        
+
         $stmt = $db->prepare("
-            UPDATE users 
-            SET password_reset_token = ?, password_reset_code = ?, password_reset_code_expires = ? 
+            UPDATE users
+            SET password_reset_token = ?, password_reset_code = ?, password_reset_code_expires = ?
             WHERE id = ?
         ");
         $stmt->execute([$resetToken, $resetCode, $resetExpires, $user['id']]);
-        
-        sendPasswordResetCodeEmail($email, $user['first_name'], $resetCode);
+
+        // Extract first name from full name for email
+        $firstName = explode(' ', $user['full_name'])[0];
+        sendPasswordResetCodeEmail($email, $firstName, $resetCode);
         
         echo json_encode([
             'success' => true,
@@ -632,8 +678,8 @@ function handleVerifyResetCode($input) {
         }
         
         $stmt = $db->prepare("
-            SELECT id, email, password_reset_code, password_reset_code_expires, first_name, last_name 
-            FROM users 
+            SELECT id, email, password_reset_code, password_reset_code_expires, full_name
+            FROM users
             WHERE password_reset_token = ?
         ");
         $stmt->execute([$input['reset_token']]);
@@ -676,27 +722,29 @@ function handleResendResetCode($input) {
         }
         
         $stmt = $db->prepare("
-            SELECT id, email, first_name 
-            FROM users 
+            SELECT id, email, full_name
+            FROM users
             WHERE password_reset_token = ?
         ");
         $stmt->execute([$input['reset_token']]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$user) {
             throw new Exception('Invalid reset token');
         }
-        
+
         $resetCode = sprintf('%06d', mt_rand(0, 999999));
-        
+
         $stmt = $db->prepare("
-            UPDATE users 
-            SET password_reset_code = ?, password_reset_code_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) 
+            UPDATE users
+            SET password_reset_code = ?, password_reset_code_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE)
             WHERE id = ?
         ");
         $stmt->execute([$resetCode, $user['id']]);
-        
-        sendPasswordResetCodeEmail($user['email'], $user['first_name'], $resetCode);
+
+        // Extract first name from full name for email
+        $firstName = explode(' ', $user['full_name'])[0];
+        sendPasswordResetCodeEmail($user['email'], $firstName, $resetCode);
         
         echo json_encode([
             'success' => true,
@@ -863,8 +911,8 @@ function handleResetPassword($input) {
         
         $passwordHash = password_hash($input['password'], PASSWORD_DEFAULT);
         $stmt = $db->prepare("
-            UPDATE users 
-            SET password_hash = ?, password_reset_token = NULL, password_reset_code = NULL, password_reset_code_expires = NULL 
+            UPDATE users
+            SET password = ?, password_reset_token = NULL, password_reset_code = NULL, password_reset_code_expires = NULL
             WHERE id = ?
         ");
         $stmt->execute([$passwordHash, $user['id']]);

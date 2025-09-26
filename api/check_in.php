@@ -2,6 +2,11 @@
 require_once '../config/database.php';
 require_once '../includes/email_functions.php';
 
+// Increase upload limits for this script
+ini_set('upload_max_filesize', '10M');
+ini_set('post_max_size', '10M');
+ini_set('max_file_uploads', '5');
+
 // CORS & JSON headers
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -30,7 +35,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch($method) {
     case 'POST':
-        handleCheckin();
+        if (isset($_POST['action']) && $_POST['action'] === 'upload_vaccination_proof') {
+            handleVaccinationProofUpload();
+        } else {
+            handleCheckin();
+        }
         break;
     case 'GET':
         if (isset($_GET['action']) && $_GET['action'] === 'get_latest_rfid') {
@@ -42,34 +51,6 @@ switch($method) {
         http_response_code(405);
         echo json_encode(['error' => 'Method not allowed']);
         break;
-}
-
-
-try {
-    // Send booking confirmation email (suppress warnings for local development)
-    if ($_SERVER['HTTP_HOST'] === 'localhost' || strpos($_SERVER['HTTP_HOST'], '127.0.0.1') !== false) {
-        // For local development, simulate successful email sending
-        $emailSent = true;
-        $trackingEmailSent = true;
-        error_log("Local development: Email sending simulation enabled");
-    } else {
-        // Send booking confirmation email
-        $emailSent = sendBookingConfirmationEmail($bookingId);
-        
-        // Send tracking link email
-        $trackingEmailSent = sendTrackingLinkEmail($bookingId, $input['ownerEmail'], $input['customRFID']);
-    }
-    
-    // Update email sent flags if successful
-    if ($emailSent || $trackingEmailSent) {
-        $stmt = $db->prepare("UPDATE bookings SET welcome_email_sent = 1 WHERE id = ?");
-        $stmt->execute([$bookingId]);
-    }
-} catch (Exception $emailError) {
-    error_log("Email sending failed: " . $emailError->getMessage());
-    // Don't fail the entire booking if email fails
-    $emailSent = false;
-    $trackingEmailSent = false;
 }
 
 function getLatestRFIDFromMySQL() {
@@ -212,6 +193,55 @@ function getNextStatus($currentStatus) {
     return $statusFlow[$currentStatus] ?? null;
 }
 
+function handleVaccinationProofUpload() {
+    // Increase upload limits for this request
+    ini_set('upload_max_filesize', '10M');
+    ini_set('post_max_size', '10M');
+    ini_set('max_file_uploads', '5');
+
+    try {
+        if (!empty($_FILES['vaccinationProof']) && $_FILES['vaccinationProof']['error'] === UPLOAD_ERR_OK) {
+            // Handle file upload
+            $uploadDir = '../uploads/vaccines/';
+
+            // Create directory if it doesn't exist
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            // Generate unique filename
+            $fileExtension = pathinfo($_FILES['vaccinationProof']['name'], PATHINFO_EXTENSION);
+            $fileName = 'vaccine_' . time() . '_' . uniqid() . '.' . $fileExtension;
+            $filePath = $uploadDir . $fileName;
+
+            // Move uploaded file
+            if (move_uploaded_file($_FILES['vaccinationProof']['tmp_name'], $filePath)) {
+                $filePathForDB = 'uploads/vaccines/' . $fileName;
+
+                ob_clean();
+                echo json_encode([
+                    'success' => true,
+                    'file_path' => $filePathForDB,
+                    'message' => 'Vaccination proof uploaded successfully'
+                ]);
+                return;
+            } else {
+                throw new Exception('Failed to save uploaded file');
+            }
+        } else {
+            $errorCode = $_FILES['vaccinationProof']['error'] ?? 'no file';
+            throw new Exception('No file uploaded or upload error: ' . $errorCode);
+        }
+    } catch(Exception $e) {
+        ob_clean();
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
 function handleCheckin() {
     try {
         // Add a small delay to prevent rapid successive requests
@@ -227,8 +257,23 @@ function handleCheckin() {
         file_put_contents($lockFile, time());
         
         $db = getDB();
-        $input = json_decode(file_get_contents('php://input'), true);
-        
+        $input = $_POST;
+
+        // Debug: Log FILES and POST data
+        error_log('DEBUG FILES: ' . json_encode($_FILES));
+        error_log('DEBUG POST: ' . json_encode($_POST));
+
+        // Decode JSON fields
+        if (!empty($input['vaccineTypes'])) {
+            $input['vaccineTypes'] = json_decode($input['vaccineTypes'], true);
+        }
+        if (!empty($input['services'])) {
+            $input['services'] = json_decode($input['services'], true);
+        }
+        if (!empty($input['packageCustomizations'])) {
+            $input['packageCustomizations'] = json_decode($input['packageCustomizations'], true);
+        }
+
         // Validate required fields
         $required = ['petName', 'petType', 'petBreed', 'ownerName', 'ownerPhone', 'ownerEmail', 'customRFID'];
         foreach ($required as $field) {
@@ -262,6 +307,11 @@ function handleCheckin() {
         if (!empty($input['services'])) {
             addServicesToBooking($db, $bookingId, $input['services']);
         }
+
+        // Store package customizations
+        if (!empty($input['packageCustomizations'])) {
+            storePackageCustomizations($db, $bookingId, $input['packageCustomizations']);
+        }
         
         // Create initial status update
         createStatusUpdate($db, $bookingId, 'checked-in', 'Initial check-in completed');
@@ -276,8 +326,20 @@ function handleCheckin() {
         
         // Commit transaction
         $db->commit();
-        
-          // Try to send emails (after successful booking creation)
+
+        // Debug file upload status
+        $fileUploadStatus = 'No vaccination proof';
+        if (!empty($input['vaccinationProofPath'])) {
+            $fileUploadStatus = 'Using pre-uploaded file: ' . $input['vaccinationProofPath'];
+        } elseif (!empty($_FILES['vaccinationProof'])) {
+            if ($_FILES['vaccinationProof']['error'] === UPLOAD_ERR_OK) {
+                $fileUploadStatus = 'File received: ' . $_FILES['vaccinationProof']['name'] . ' (' . $_FILES['vaccinationProof']['size'] . ' bytes)';
+            } else {
+                $fileUploadStatus = 'File upload error: ' . $_FILES['vaccinationProof']['error'];
+            }
+        }
+
+           // Try to send emails (after successful booking creation)
         $emailSent = false;
         $trackingEmailSent = false;
         
@@ -310,7 +372,8 @@ function handleCheckin() {
             'tracking_url' => "guest_dashboard.html?token=" . urlencode($input['customRFID']),
             'message' => 'Check-in completed successfully',
             'email_sent' => $emailSent,
-            'tracking_email_sent' => $trackingEmailSent
+            'tracking_email_sent' => $trackingEmailSent,
+            'debug_file_upload' => $fileUploadStatus
         ]);
         
     } catch(Exception $e) {
@@ -374,7 +437,7 @@ function createPet($db, $customerId, $input) {
         // Map common age descriptions to valid enum values
         $ageMapping = [
             'puppy' => 'puppy',
-            'young' => 'young', 
+            'young' => 'young',
             'adult' => 'adult',
             'senior' => 'senior',
             'kitten' => 'puppy',  // Map kitten to puppy (both are babies)
@@ -383,27 +446,75 @@ function createPet($db, $customerId, $input) {
             'old' => 'senior',
             'elderly' => 'senior'
         ];
-        
+
         $inputAge = strtolower(trim($input['petAge']));
         if (isset($ageMapping[$inputAge])) {
             $ageRange = $ageMapping[$inputAge];
         }
         // If age is not recognized, leave as null rather than cause error
     }
-    
-    // Handle pet size validation
+
+    // Handle pet size validation - use selectedPetSize if petSize is not set
     $petSize = null;
-    if (!empty($input['petSize'])) {
+    $sizeInput = !empty($input['petSize']) ? $input['petSize'] : $input['selectedPetSize'];
+    if (!empty($sizeInput)) {
         $validSizes = ['small', 'medium', 'large', 'extra_large'];
-        $inputSize = strtolower(trim($input['petSize']));
+        $inputSize = strtolower(trim($sizeInput));
         if (in_array($inputSize, $validSizes)) {
             $petSize = $inputSize;
         }
     }
-    
+
+    // Handle vaccination information
+    $lastVaccineDate = null;
+    if (!empty($input['lastVaccineDate'])) {
+        $lastVaccineDate = date('Y-m-d', strtotime($input['lastVaccineDate']));
+    }
+
+    $vaccineTypes = null;
+    if (!empty($input['vaccineTypes']) && is_array($input['vaccineTypes'])) {
+        $vaccineTypes = implode(',', $input['vaccineTypes']);
+    }
+
+    $vaccinationProof = null;
+    // Use the pre-uploaded file path if available
+    if (!empty($input['vaccinationProofPath'])) {
+        $vaccinationProof = $input['vaccinationProofPath'];
+        error_log('Using pre-uploaded vaccination proof: ' . $vaccinationProof);
+    } elseif (!empty($_FILES['vaccinationProof']) && $_FILES['vaccinationProof']['error'] === UPLOAD_ERR_OK) {
+        error_log('Vaccination proof file upload detected: ' . $_FILES['vaccinationProof']['name']);
+
+        // Handle file upload (fallback for direct upload)
+        $uploadDir = '../uploads/vaccines/';
+
+        // Create directory if it doesn't exist
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+            error_log('Created upload directory: ' . $uploadDir);
+        }
+
+        // Generate unique filename
+        $fileExtension = pathinfo($_FILES['vaccinationProof']['name'], PATHINFO_EXTENSION);
+        $fileName = 'vaccine_' . time() . '_' . uniqid() . '.' . $fileExtension;
+        $filePath = $uploadDir . $fileName;
+
+        error_log('Attempting to move file to: ' . $filePath);
+
+        // Move uploaded file
+        if (move_uploaded_file($_FILES['vaccinationProof']['tmp_name'], $filePath)) {
+            $vaccinationProof = 'uploads/vaccines/' . $fileName;
+            error_log('File uploaded successfully: ' . $vaccinationProof);
+        } else {
+            error_log('Failed to move uploaded vaccination proof file. Error: ' . $_FILES['vaccinationProof']['error']);
+        }
+    } else {
+        error_log('No vaccination proof available');
+    }
+
     $stmt = $db->prepare("
-        INSERT INTO pets (customer_id, name, type, pet_type, breed, age_range, size, special_notes) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO pets (customer_id, name, type, pet_type, breed, age_range, size, special_notes,
+                         last_vaccine_date, vaccine_types, custom_vaccine, vaccination_proof)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $customerId,
@@ -413,7 +524,11 @@ function createPet($db, $customerId, $input) {
         $input['petBreed'],
         $ageRange,
         $petSize,
-        $input['specialNotes'] ?? null
+        $input['specialNotes'] ?? null,
+        $lastVaccineDate,
+        $vaccineTypes,
+        $input['customVaccine'] ?? null,
+        $vaccinationProof
     ]);
     return $db->lastInsertId();
 }
@@ -454,6 +569,27 @@ function addServicesToBooking($db, $bookingId, $services) {
 function createStatusUpdate($db, $bookingId, $status, $notes) {
     $stmt = $db->prepare("INSERT INTO status_updates (booking_id, status, notes) VALUES (?, ?, ?)");
     $stmt->execute([$bookingId, $status, $notes]);
+}
+
+function storePackageCustomizations($db, $bookingId, $packageCustomizations) {
+    if (!empty($packageCustomizations) && is_array($packageCustomizations)) {
+        foreach ($packageCustomizations as $packageName => $customization) {
+            if (!empty($customization['includedServices']) && is_array($customization['includedServices'])) {
+                foreach ($customization['includedServices'] as $serviceName) {
+                    $stmt = $db->prepare("INSERT INTO package_customizations (booking_id, package_name, service_name, included) VALUES (?, ?, ?, 1)");
+                    $stmt->execute([$bookingId, $packageName, $serviceName]);
+                }
+            }
+
+            // Also store excluded services for reference
+            if (!empty($customization['excludedServices']) && is_array($customization['excludedServices'])) {
+                foreach ($customization['excludedServices'] as $serviceName) {
+                    $stmt = $db->prepare("INSERT INTO package_customizations (booking_id, package_name, service_name, included) VALUES (?, ?, ?, 0)");
+                    $stmt->execute([$bookingId, $packageName, $serviceName]);
+                }
+            }
+        }
+    }
 }
 
 // function sendTrackingLinkEmail($bookingId, $customerEmail, $customRFID) {

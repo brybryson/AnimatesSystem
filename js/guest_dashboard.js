@@ -10,39 +10,46 @@ const API_BASE = 'http://localhost/animates/api/';
 
 const statusConfig = {
     'checked-in': {
-        label: 'Checked In',
+        label: 'Check-in Process',
         icon: 'fa-clipboard-check',
         color: 'blue',
-        progress: 20,
+        progress: 33,
         description: 'Your pet has been checked in and is waiting for services'
     },
     'bathing': {
-        label: 'Bathing',
-        icon: 'fa-bath',
-        color: 'indigo',
-        progress: 40,
-        description: 'Your pet is currently being bathed and pampered'
+        label: 'Services Ongoing',
+        icon: 'fa-cogs',
+        color: 'gold',
+        progress: 66,
+        description: 'Professional grooming services are in progress'
     },
     'grooming': {
-        label: 'Grooming',
-        icon: 'fa-scissors',
-        color: 'purple',
-        progress: 60,
-        description: 'Professional grooming services in progress'
+        label: 'Services Ongoing',
+        icon: 'fa-cogs',
+        color: 'gold',
+        progress: 66,
+        description: 'Professional grooming services are in progress'
     },
     'ready': {
-        label: 'Ready for Pickup',
-        icon: 'fa-bell',
-        color: 'green',
-        progress: 80,
-        description: 'Your pet is ready! Please come for pickup'
+        label: 'Services Ongoing',
+        icon: 'fa-cogs',
+        color: 'gold',
+        progress: 66,
+        description: 'Professional grooming services are in progress'
+    },
+    'in-progress': {
+        label: 'Services Ongoing',
+        icon: 'fa-cogs',
+        color: 'gold',
+        progress: 66,
+        description: 'Professional grooming services are in progress'
     },
     'completed': {
-        label: 'Service Completed',
+        label: 'Pet Ready for Pickup',
         icon: 'fa-check-circle',
         color: 'emerald',
         progress: 100,
-        description: 'Service completed successfully - Thank you for choosing us!'
+        description: 'Your pet is ready! Please come for pickup'
     }
 };
 
@@ -195,27 +202,55 @@ function populateDashboard(data) {
 
 function updateStatus(status) {
     const config = statusConfig[status] || statusConfig['checked-in'];
-    
-    // Update status badge
+
+    // Update status badge with explicit color classes
     const statusBadge = document.getElementById('statusBadge');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
-    
-    statusBadge.className = `inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-${config.color}-100 text-${config.color}-800 border border-${config.color}-200`;
-    statusDot.className = `w-2 h-2 rounded-full mr-2 bg-${config.color}-500`;
+
+    // Use explicit color classes instead of dynamic ones
+    let badgeBgColor, badgeTextColor, badgeBorderColor, dotBgColor;
+    switch(config.color) {
+        case 'blue':
+            badgeBgColor = 'bg-blue-100';
+            badgeTextColor = 'text-blue-800';
+            badgeBorderColor = 'border-blue-200';
+            dotBgColor = 'bg-blue-500';
+            break;
+        case 'gold':
+            badgeBgColor = 'bg-yellow-100';
+            badgeTextColor = 'text-yellow-800';
+            badgeBorderColor = 'border-yellow-200';
+            dotBgColor = 'bg-yellow-500';
+            break;
+        case 'emerald':
+            badgeBgColor = 'bg-emerald-100';
+            badgeTextColor = 'text-emerald-800';
+            badgeBorderColor = 'border-emerald-200';
+            dotBgColor = 'bg-emerald-500';
+            break;
+        default:
+            badgeBgColor = 'bg-blue-100';
+            badgeTextColor = 'text-blue-800';
+            badgeBorderColor = 'border-blue-200';
+            dotBgColor = 'bg-blue-500';
+    }
+
+    statusBadge.className = `inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${badgeBgColor} ${badgeTextColor} border ${badgeBorderColor}`;
+    statusDot.className = `w-2 h-2 rounded-full mr-2 ${dotBgColor}`;
     statusText.textContent = config.label;
-    
+
     // Add pulse animation for active statuses
-    if (['bathing', 'grooming'].includes(status)) {
+    if (['in-progress'].includes(status)) {
         statusDot.classList.add('status-pulse');
     } else {
         statusDot.classList.remove('status-pulse');
     }
-    
+
     // Update progress bar
     const progressBar = document.getElementById('progressBar');
     progressBar.style.width = config.progress + '%';
-    
+
     // Update timeline
     updateTimeline(status);
 }
@@ -224,33 +259,66 @@ function updateStatus(status) {
 // Updated updateTimeline function - replace existing function
 function updateTimeline(currentStatus) {
     const timelineSteps = document.getElementById('timelineSteps');
-    const steps = ['checked-in', 'bathing', 'grooming', 'ready', 'completed']; // ADDED 'completed'
-    
+    const steps = ['checked-in', 'in-progress', 'completed'];
+
+    // Map old status values to new ones for timeline logic
+    let mappedStatus = currentStatus;
+    if (['bathing', 'grooming', 'ready'].includes(currentStatus)) {
+        mappedStatus = 'in-progress';
+    }
+
     timelineSteps.innerHTML = steps.map((step, index) => {
         const config = statusConfig[step];
-        const isActive = step === currentStatus;
-        const isCompleted = steps.indexOf(currentStatus) > index;
-        const isPending = steps.indexOf(currentStatus) < index;
-        
+        const isActive = step === mappedStatus;
+        const isCompleted = steps.indexOf(mappedStatus) > index;
+        const isPending = steps.indexOf(mappedStatus) < index;
+
         let statusClass, iconClass, textClass, timeClass;
-        
+
         if (isCompleted) {
-            statusClass = `bg-green-500 border-green-500`;
+            statusClass = 'bg-green-500 border-green-500';
             iconClass = 'text-white';
             textClass = 'text-green-700 font-semibold';
             timeClass = 'text-green-600';
         } else if (isActive) {
-            statusClass = `bg-${config.color}-500 border-${config.color}-500 status-pulse`;
+            // Use explicit color classes instead of dynamic ones
+            let bgColor, borderColor, textColor, timeTextColor;
+            switch(config.color) {
+                case 'blue':
+                    bgColor = 'bg-blue-500';
+                    borderColor = 'border-blue-500';
+                    textColor = 'text-blue-700';
+                    timeTextColor = 'text-blue-600';
+                    break;
+                case 'gold':
+                    bgColor = 'bg-yellow-500';
+                    borderColor = 'border-yellow-500';
+                    textColor = 'text-yellow-700';
+                    timeTextColor = 'text-yellow-600';
+                    break;
+                case 'emerald':
+                    bgColor = 'bg-emerald-500';
+                    borderColor = 'border-emerald-500';
+                    textColor = 'text-emerald-700';
+                    timeTextColor = 'text-emerald-600';
+                    break;
+                default:
+                    bgColor = 'bg-blue-500';
+                    borderColor = 'border-blue-500';
+                    textColor = 'text-blue-700';
+                    timeTextColor = 'text-blue-600';
+            }
+            statusClass = `${bgColor} ${borderColor} status-pulse`;
             iconClass = 'text-white';
-            textClass = `text-${config.color}-700 font-semibold`;
-            timeClass = `text-${config.color}-600`;
+            textClass = `${textColor} font-semibold`;
+            timeClass = timeTextColor;
         } else {
             statusClass = 'bg-gray-100 border-gray-300';
             iconClass = 'text-gray-400';
             textClass = 'text-gray-500';
             timeClass = 'text-gray-400';
         }
-        
+
         // Get timestamp for this step if available
         let stepTime = '';
         if (currentBookingData && currentBookingData.status_history) {
@@ -259,12 +327,12 @@ function updateTimeline(currentStatus) {
                 stepTime = formatTime(statusUpdate.created_at);
             }
         }
-        
+
         // Special styling for completed status
         if (step === 'completed' && isActive) {
             statusClass = 'bg-gradient-to-r from-emerald-500 to-green-600 border-emerald-500 completion-glow';
         }
-        
+
         return `
             <div class="relative flex items-start">
                 <div class="relative z-10 w-16 h-16 ${statusClass} border-4 rounded-full flex items-center justify-center shadow-lg">
@@ -277,7 +345,7 @@ function updateTimeline(currentStatus) {
                         ${stepTime ? `<span class="text-sm ${timeClass} font-medium">${stepTime}</span>` : ''}
                     </div>
                     <p class="text-sm text-gray-600 mt-1">${config.description}</p>
-                    ${isActive && step === 'completed' ? '<div class="mt-2 text-sm font-bold text-emerald-600">🎉 Thank you for choosing 8Paws Pet Boutique!</div>' : ''}
+                    ${isActive && step === 'completed' ? '<div class="mt-2 text-sm font-bold text-emerald-600">🎉 Thank you for choosing Animates PH!</div>' : ''}
                     ${isActive && step !== 'completed' ? '<div class="mt-2 text-sm font-medium text-blue-600">🔄 Currently in progress...</div>' : ''}
                 </div>
             </div>
@@ -335,21 +403,136 @@ window.closeCelebration = function() {
 
 function populateServices(services) {
     const servicesList = document.getElementById('servicesList');
-    
+
     if (!services || services.length === 0) {
         servicesList.innerHTML = '<p class="text-gray-500 text-center py-4">No services selected</p>';
         return;
     }
-    
-    servicesList.innerHTML = services.map(service => `
-        <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-            <div>
-                <span class="font-medium text-gray-900">${service.name}</span>
-                <p class="text-sm text-gray-600">${service.description || 'Professional service'}</p>
+
+    // Get package customizations from current booking data
+    const packageCustomizations = currentBookingData?.package_customizations || [];
+
+    // Get all service names that are part of packages
+    const packageServiceNames = new Set();
+    // Also get package names themselves
+    const packageNames = new Set();
+
+    packageCustomizations.forEach(packageData => {
+        packageNames.add(packageData.name);
+        packageData.services.forEach(service => {
+            packageServiceNames.add(service.name);
+        });
+    });
+
+    let html = '';
+
+    // Display regular services first (non-package services and not part of any package)
+    const regularServices = services.filter(service => {
+        // Exclude if category is 'package'
+        if (service.category === 'package') return false;
+
+        // Exclude if service name matches any package service
+        if (packageServiceNames.has(service.name)) return false;
+
+        // Exclude if service name is contained in any package name (handles "Package" vs "Package (Customized)")
+        for (let packageName of packageNames) {
+            if (packageName.includes(service.name) || service.name.includes(packageName.replace(' (Customized)', ''))) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+    if (regularServices.length > 0) {
+        html += regularServices.map(service => `
+            <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <span class="font-medium text-gray-900">${service.name}</span>
+                    <p class="text-sm text-gray-600">${service.description || 'Professional service'}</p>
+                </div>
+                <span class="text-lg font-bold text-primary">₱${parseFloat(service.price || 0).toFixed(2)}</span>
             </div>
-            <span class="text-lg font-bold text-primary">₱${parseFloat(service.price).toFixed(2)}</span>
-        </div>
-    `).join('');
+        `).join('');
+    }
+
+    // Display package services with expandable details
+    packageCustomizations.forEach(packageData => {
+        const packageName = packageData.name;
+        const packageServices = packageData.services || [];
+        const isCustomized = packageServices.some(s => !s.included);
+
+        // Calculate total price for this package from the services data
+        const packageService = services.find(s => s.name.includes(packageName) || s.name === packageName);
+        const packagePrice = packageService ? parseFloat(packageService.price || 0) : 0;
+
+        html += `
+            <div class="bg-gray-50 rounded-lg overflow-hidden">
+                <div class="p-4 cursor-pointer package-header" data-package="${packageName.replace(/\s+/g, '-').toLowerCase()}">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <span class="font-bold text-gray-900 text-lg">${packageName}${isCustomized ? ' (Customized)' : ''}</span>
+                            <span class="text-sm text-gray-700 bg-gray-200 px-2 py-1 rounded-full ml-2">Package</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-lg font-bold text-primary mr-3">₱${packagePrice.toFixed(2)}</span>
+                            <svg class="w-5 h-5 text-primary transform transition-transform duration-200 package-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="package-details hidden px-4 pb-4">
+                    <div class="border-t border-gray-200 pt-3">
+                        <p class="text-sm font-medium text-gray-800 mb-3">Package Contents:</p>
+                        <div class="space-y-2">
+                            ${packageServices.map(service => {
+                                if (service.included) {
+                                    return `
+                                        <div class="flex justify-between items-center pl-4 border-l-2 border-green-300 bg-green-50/50 rounded">
+                                            <div class="flex items-center">
+                                                <span class="text-green-600 mr-2">✓</span>
+                                                <span class="font-medium text-gray-900">${service.name}</span>
+                                            </div>
+                                            <span class="text-sm text-green-600 font-medium">Included</span>
+                                        </div>
+                                    `;
+                                } else {
+                                    return `
+                                        <div class="flex justify-between items-center pl-4 border-l-2 border-red-300 bg-red-50/50 rounded opacity-60">
+                                            <div class="flex items-center">
+                                                <span class="text-red-500 mr-2 line-through">✗</span>
+                                                <span class="font-medium text-gray-500 line-through">${service.name}</span>
+                                            </div>
+                                            <span class="text-sm text-red-500 font-medium">Excluded</span>
+                                        </div>
+                                    `;
+                                }
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    servicesList.innerHTML = html;
+
+    // Add click handlers for package expansion
+    document.querySelectorAll('.package-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const packageId = this.dataset.package;
+            const details = this.parentElement.querySelector('.package-details');
+            const arrow = this.querySelector('.package-arrow');
+
+            if (details.classList.contains('hidden')) {
+                details.classList.remove('hidden');
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                details.classList.add('hidden');
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        });
+    });
 }
 
 function startAutoRefresh() {

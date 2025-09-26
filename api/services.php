@@ -89,7 +89,7 @@ function getServicesWithPricing($db) {
         // Convert to indexed array grouped by category
         $groupedServices = [
             'basic' => [],
-            'premium' => [],
+            'package' => [],
             'addon' => []
         ];
         

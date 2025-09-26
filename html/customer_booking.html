@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>8Paws - Customer Portal</title>
+    <title>8Paws - Book Appointment</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -76,10 +76,10 @@
                 
                 <!-- Navigation -->
                 <nav class="hidden md:flex items-center space-x-6">
-                    <a href="#" onclick="showSection('tracking')" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">Track Pet</a>
-                    <a href="#" onclick="showSection('appointment')" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Book Appointment</a>
-                    <a href="#" onclick="showSection('my-appointments')" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">My Appointments</a>
-                    <a href="#" onclick="showSection('history')" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">History</a>
+                    <a href="customer_tracking.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Track Pet</a>
+                    <a href="#" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">Book Appointment</a>
+                    <a href="customer_appointments.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">My Appointments</a>
+                    <a href="customer_history.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">History</a>
 
                     
                     <div class="border-l border-gray-300 pl-6 ml-2">
@@ -103,10 +103,10 @@
             <!-- Mobile Navigation -->
             <div id="mobileMenu" class="md:hidden hidden pb-4">
                 <div class="flex flex-col space-y-2">
-                    <a href="#" onclick="showSection('tracking')" class="mobile-nav-link text-gold-600 font-semibold py-2 transition-colors duration-200">Track Pet</a>
-                    <a href="#" onclick="showSection('appointment')" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Book Appointment</a>
-                    <a href="#" onclick="showSection('my-appointments')" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">My Appointments</a>
-                    <a href="#" onclick="showSection('history')" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">History</a>
+                    <a href="customer_tracking.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Track Pet</a>
+                    <a href="#" class="mobile-nav-link text-gold-600 font-semibold py-2 transition-colors duration-200">Book Appointment</a>
+                    <a href="customer_appointments.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">My Appointments</a>
+                    <a href="customer_history.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">History</a>
 
                     <div class="border-t border-gray-300 pt-3 mt-3">
                         <button onclick="logout()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600 py-2 w-full text-left">
@@ -140,7 +140,7 @@
 
             <!-- Quick Actions -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <button onclick="showSection('tracking')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                <button onclick="window.location.href='customer_tracking.html'" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
                     <div class="w-16 h-16 bg-gradient-to-br from-gold-100 to-gold-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -150,7 +150,7 @@
                     <p class="text-sm text-gray-600">Real-time RFID tracking</p>
                 </button>
                 
-                <button onclick="showSection('appointment')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                <button onclick="window.location.href='customer_booking.html'" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
                     <div class="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -160,7 +160,7 @@
                     <p class="text-sm text-gray-600">Schedule service</p>
                 </button>
                 
-                <button onclick="showSection('my-appointments')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                <button onclick="window.location.href='customer_appointments.html'" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
                     <div class="w-16 h-16 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
@@ -170,7 +170,7 @@
                     <p class="text-sm text-gray-600">Manage bookings</p>
                 </button>
                 
-                <button onclick="showSection('history')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                <button onclick="window.location.href='customer_history.html'" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
                     <div class="w-16 h-16 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -181,104 +181,7 @@
                 </button>
             </div>
 
-            <!-- Content Sections -->
-            <div id="tracking" class="section">
-                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
-                    <div class="mb-8">
-                        <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-                            <div class="w-8 h-8 bg-gold-100 rounded-full flex items-center justify-center">
-                                <svg class="w-5 h-5 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
-                            </div>
-                            Track Your Pet
-                        </h2>
-                        <p class="text-gray-600 text-sm">Monitor your pet's grooming progress in real-time</p>
-                    </div>
-
-                    <div id="activeBookingsContainer" class="space-y-6">
-                        <div class="text-center py-16">
-                            <div class="w-24 h-24 bg-gold-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <svg class="w-12 h-12 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                </svg>
-                            </div>
-                            <p class="text-gray-500 text-xl font-medium mb-2">Loading your active bookings...</p>
-                            <p class="text-gray-400 text-sm">Please wait while we fetch your pet's information</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- My Appointments Section -->
-            <div id="my-appointments" class="section hidden">
-                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                            </div>
-                            My Appointments
-                        </h2>
-                        <button onclick="showSection('appointment')" class="bg-gold-500 hover:bg-gold-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
-                            Book New Appointment
-                        </button>
-                    </div>
-                    
-                    <div class="flex space-x-2 mb-6">
-                        <button onclick="filterAppointments('all')" class="px-4 py-2 bg-gold-500 text-white rounded-lg text-sm font-medium">All</button>
-                        <button onclick="filterAppointments('scheduled')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Scheduled</button>
-                        <button onclick="filterAppointments('confirmed')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Confirmed</button>
-                        <button onclick="filterAppointments('completed')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Completed</button>
-                        <button onclick="filterAppointments('cancelled')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Cancelled</button>
-                    </div>
-                    
-                    <div id="appointmentsContainer">
-                        <div class="text-center py-12">
-                            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                            </div>
-                            <p class="text-gray-500 text-lg">Loading your appointments...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="history" class="section hidden">
-                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </div>
-                            Service History
-                        </h2>
-                        <div class="flex space-x-2">
-                            <button onclick="filterHistory('all')" class="px-4 py-2 bg-gold-500 text-white rounded-lg text-sm font-medium">All</button>
-                            <button onclick="filterHistory('month')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">This Month</button>
-                            <button onclick="filterHistory('year')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">This Year</button>
-                        </div>
-                    </div>
-                    <div id="historyContainer">
-                        <div class="text-center py-12">
-                            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </div>
-                            <p class="text-gray-500 text-lg">Loading service history...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="appointment" class="section hidden">
+            <div id="appointment" class="section">
                 <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
                     <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                         <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -335,6 +238,104 @@
 
                         </div>
 
+                        <!-- Vaccination Information Section -->
+                        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold text-amber-900 mb-4 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Vaccination Information
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Last Vaccine Update Date *</label>
+                                    <input type="date" id="lastVaccineDate" name="lastVaccineDate" required
+                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-colors">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Type of Vaccine *</label>
+                                    <select id="vaccineType" name="vaccineType" required
+                                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-colors">
+                                        <option value="">Select vaccine type</option>
+                                        <option value="rabies">Rabies</option>
+                                        <option value="parvo">Parvo</option>
+                                        <option value="distemper">Distemper</option>
+                                        <option value="bordetella">Bordetella</option>
+                                        <option value="dhpp">DHPP</option>
+                                        <option value="fvrp">FVRCP (for cats)</option>
+                                        <option value="others">Others (please specify)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="customVaccineContainer" class="hidden mt-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Specify Other Vaccine *</label>
+                                <input type="text" id="customVaccine" name="customVaccine"
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-colors"
+                                       placeholder="Enter the specific vaccine name">
+                            </div>
+
+                            <div class="mt-6">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Proof of Vaccination *</label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-amber-400 transition-colors">
+                                    <input type="file" id="vaccinationProof" name="vaccinationProof" required
+                                           class="hidden">
+                                    <div id="uploadArea">
+                                        <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                        </svg>
+                                        <p class="text-gray-600 font-medium mb-2">Upload Vaccination Proof</p>
+                                        <p class="text-sm text-gray-500 mb-4">Click to browse or drag and drop</p>
+                                        <button type="button" id="vaccinationUploadBtn"
+                                                class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors">
+                                            Choose File
+                                        </button>
+                                    </div>
+                                    <div id="previewArea" class="hidden">
+                                        <img id="vaccinationPreview" class="max-w-full max-h-48 mx-auto rounded-lg shadow-md">
+                                        <button type="button" id="vaccinationRemoveBtn"
+                                                class="mt-2 px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm">
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">Accepted formats: JPG, PNG, PDF. Max size: 5MB</p>
+                            </div>
+                        </div>
+
+                        <!-- Owner Information -->
+                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                                Owner Information
+                            </h3>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Owner Name</label>
+                                <input type="text" name="ownerName" id="ownerName" readonly
+                                       class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 cursor-not-allowed"
+                                       placeholder="Loading...">
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                    <input type="tel" name="ownerPhone" id="ownerPhone" readonly
+                                           class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 cursor-not-allowed"
+                                           placeholder="Loading...">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                    <input type="email" name="ownerEmail" id="ownerEmail" readonly
+                                           class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 cursor-not-allowed"
+                                           placeholder="Loading...">
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Appointment Details -->
                         <div class="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
                             <h3 class="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
@@ -386,7 +387,7 @@
                                 </div>
                                 <div class="bg-white/80 rounded-lg p-4">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Select your pet's size to see accurate pricing *</label>
-                                    <select id="petSizeForPricing" required
+                                    <select name="petSizeForPricing" id="petSizeForPricing" required
                                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-colors">
                                         <option value="">Select pet size for pricing</option>
                                         <option value="small">Small (0-15 lbs)</option>
@@ -405,8 +406,11 @@
 
                             <div id="servicesContainer" class="space-y-6 mb-8">
                                 <div class="text-center py-8">
-                                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-gold-500 mx-auto mb-4"></div>
-                                    <p class="text-gray-600">Loading services...</p>
+                                    <svg class="w-12 h-12 text-amber-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <p class="text-amber-600 font-medium">Please select your pet's size first</p>
+                                    <p class="text-sm text-amber-500">This will show accurate pricing for all services</p>
                                 </div>
                             </div>
 
@@ -570,22 +574,67 @@
                 </div>
 
                 <!-- Service Selection -->
-                <div class="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
-                    <h3 class="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                        </svg>
-                        Select Services
-                    </h3>
-                    
-                    <div id="editServicesContainer" class="space-y-6">
-                        <div class="text-center py-8">
-                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-4">Select Services</label>
+
+                    <!-- Pet Size Selection for Pricing -->
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6 shadow-sm mb-6">
+                        <div class="flex items-center mb-4">
+                            <div class="inline-flex items-center justify-center w-10 h-10 bg-amber-100 rounded-full mr-3">
+                                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
                                 </svg>
                             </div>
-                            <p class="text-purple-600 font-medium">Loading services...</p>
+                            <h3 class="text-lg font-semibold text-amber-900">Pet Size for Pricing</h3>
+                        </div>
+                        <div class="bg-white/80 rounded-lg p-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select your pet's size to see accurate pricing *</label>
+                            <select id="editPetSizeForPricing" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-colors">
+                                <option value="">Select pet size for pricing</option>
+                                <option value="small">Small (0-15 lbs)</option>
+                                <option value="medium">Medium (16-40 lbs)</option>
+                                <option value="large">Large (41-70 lbs)</option>
+                                <option value="extra_large">Extra Large (71+ lbs)</option>
+                            </select>
+                            <p class="text-sm text-amber-700 mt-2">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Prices vary by pet size. Please select to see accurate pricing.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="editServicesContainer" class="space-y-6 mb-8">
+                        <div class="text-center py-8">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-gold-500 mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading services...</p>
+                        </div>
+                    </div>
+
+                    <!-- Book Summary -->
+                    <div class="bg-gradient-to-r from-gold-500/5 to-gold-600/5 border-2 border-gold-500/20 rounded-xl p-6 mb-8 shadow-lg">
+                        <div class="flex items-center mb-4">
+                            <svg class="w-6 h-6 text-gold-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                            <h3 class="text-lg font-semibold text-gray-900">Book Summary</h3>
+                        </div>
+                        <div id="editSelectedServices" class="space-y-3 mb-6">
+                            <div class="text-center py-8">
+                                <svg class="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                </svg>
+                                <p class="text-gray-500 font-medium">No services selected</p>
+                                <p class="text-sm text-gray-400">Choose from the services above</p>
+                            </div>
+                        </div>
+                        <div class="border-t-2 border-gold-500/20 pt-4">
+                            <div class="flex justify-between items-center bg-white/80 rounded-lg p-4">
+                                <span class="text-xl font-bold text-gray-900">Total Amount:</span>
+                                <span id="editTotalAmount" class="text-2xl font-bold text-gold-600">₱0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -633,6 +682,6 @@
         </div>
     </div>
 
-    <script src="../js/customer_portal.js?v=2.0"></script>
+    <script src="../js/customer_booking.js?v=2.0"></script>
 </body>
 </html>

@@ -9,10 +9,10 @@ class Database {
 
     public function getConnection() {
         $this->conn = null;
-        
+
         try {
             $this->conn = new PDO(
-                "mysql:host=" . $this->host . ";dbname=" . $this->db_name,
+                "mysql:unix_socket=/Applications/XAMPP/xamppfiles/var/mysql/mysql.sock;dbname=" . $this->db_name,
                 $this->username,
                 $this->password,
                 array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION)
@@ -20,7 +20,7 @@ class Database {
         } catch(PDOException $exception) {
             throw new Exception('DB connection failed: ' . $exception->getMessage());
         }
-        
+
         return $this->conn;
     }
 }

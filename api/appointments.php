@@ -199,41 +199,42 @@ function handleGetServices() {
 
 function handleGetUserAppointments() {
     $decoded = requireAuth();
-    
+
     try {
         $db = getDB();
         $status = isset($_GET['status']) && $_GET['status'] !== 'all' ? $_GET['status'] : null;
-        
-        $query = "SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration, 
-                 a.total_amount, a.status, a.special_instructions, 
-                 p.name as pet_name, p.type as pet_type, p.breed as pet_breed 
-                 FROM appointments a 
-                 JOIN pets p ON a.pet_id = p.id 
-                 WHERE a.user_id = ?";
-        
+
+        $query = "SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
+                  a.total_amount, a.status, a.special_instructions, a.package_customizations,
+                  p.name as pet_name, p.type as pet_type, p.breed as pet_breed, p.size as pet_size,
+                  p.last_vaccine_date, p.vaccine_types, p.custom_vaccine, p.vaccination_proof
+                  FROM appointments a
+                  JOIN pets p ON a.pet_id = p.id
+                  WHERE a.user_id = ?";
+
         $params = [$decoded->user_id];
-        
+
         if ($status) {
             $query .= " AND a.status = ?";
             $params[] = $status;
         }
-        
-        $query .= " ORDER BY a.appointment_date DESC, a.appointment_time DESC";
-        
+
+        $query .= " ORDER BY a.id DESC";
+
         $stmt = $db->prepare($query);
         $stmt->execute($params);
         $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         // Get services for each appointment
         foreach ($appointments as &$appointment) {
-            $stmt = $db->prepare("SELECT s.name, s.category, aps.price 
-                                FROM appointment_services aps 
-                                JOIN services s ON aps.service_id = s.id 
+            $stmt = $db->prepare("SELECT s.name, s.category, aps.price
+                                FROM appointment_services aps
+                                JOIN services2 s ON aps.service_id = s.id
                                 WHERE aps.appointment_id = ?");
             $stmt->execute([$appointment['id']]);
             $appointment['services'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-        
+
         echo json_encode([
             'success' => true,
             'appointments' => $appointments
@@ -278,7 +279,7 @@ function handleBookAppointment($input) {
         
         if (!$customer) {
             // Get user info to create customer record
-            $stmt = $db->prepare("SELECT first_name, last_name, phone, email, address, emergency_contact_name, emergency_contact_no FROM users WHERE id = ?");
+            $stmt = $db->prepare("SELECT full_name, phone, email FROM users WHERE id = ?");
             $stmt->execute([$decoded->user_id]);
             $userInfo = $stmt->fetch(PDO::FETCH_ASSOC);
             
@@ -288,15 +289,13 @@ function handleBookAppointment($input) {
             
             // Create customer record
             $stmt = $db->prepare("
-                INSERT INTO customers (name, phone, email, address, emergency_contact, user_id, created_via) 
-                VALUES (?, ?, ?, ?, ?, ?, 'online')
+                INSERT INTO customers (name, phone, email, user_id, created_via)
+                VALUES (?, ?, ?, ?, 'online')
             ");
             $stmt->execute([
-                $userInfo['first_name'] . ' ' . $userInfo['last_name'],
+                $userInfo['full_name'],
                 $userInfo['phone'],
                 $userInfo['email'],
-                $userInfo['address'],
-                $userInfo['emergency_contact_name'] . ' - ' . $userInfo['emergency_contact_no'],
                 $decoded->user_id
             ]);
             
@@ -316,8 +315,8 @@ function handleBookAppointment($input) {
         if (!$pet) {
             // Create new pet record
             $stmt = $db->prepare("
-                INSERT INTO pets (customer_id, name, type, pet_type, breed, age_range, size, special_notes) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO pets (customer_id, name, type, pet_type, breed, age_range, size, special_notes, last_vaccine_date, vaccine_types, custom_vaccine, vaccination_proof)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $customerId,
@@ -327,36 +326,45 @@ function handleBookAppointment($input) {
                 $input['petBreed'],
                 $input['petAge'] ?? null,
                 $input['petSize'] ?? null,
-                $input['specialInstructions'] ?? null
+                $input['specialInstructions'] ?? null,
+                $input['lastVaccineDate'] ?? null,
+                isset($input['vaccineType']) ? json_encode([$input['vaccineType']]) : null,
+                $input['customVaccine'] ?? null,
+                $input['vaccinationProofPath'] ?? null
             ]);
-            
+
             $petId = $db->lastInsertId();
         } else {
             $petId = $pet['id'];
-            
+
             // Update pet info if needed
             $stmt = $db->prepare("
-                UPDATE pets 
-                SET age_range = ?, size = ?, special_notes = ? 
+                UPDATE pets
+                SET age_range = ?, size = ?, special_notes = ?, last_vaccine_date = ?, vaccine_types = ?, custom_vaccine = ?, vaccination_proof = ?
                 WHERE id = ?
             ");
             $stmt->execute([
                 $input['petAge'] ?? null,
                 $input['petSize'] ?? null,
                 $input['specialInstructions'] ?? null,
+                $input['lastVaccineDate'] ?? null,
+                isset($input['vaccineType']) ? json_encode([$input['vaccineType']]) : null,
+                $input['customVaccine'] ?? null,
+                $input['vaccinationProofPath'] ?? null,
                 $petId
             ]);
         }
         
         // Get service prices and calculate total
-        $serviceIds = array_map('intval', $input['services']);
-        $placeholders = str_repeat('?,', count($serviceIds) - 1) . '?';
-        
-        $stmt = $db->prepare("SELECT id, price, duration_minutes FROM services WHERE id IN ($placeholders)");
-        $stmt->execute($serviceIds);
+        $serviceNames = $input['services'];
+        $placeholders = str_repeat('?,', count($serviceNames) - 1) . '?';
+
+        // Check services2 table since that's what the frontend loads from
+        $stmt = $db->prepare("SELECT id, name, base_price as price, 30 as duration_minutes FROM services2 WHERE name IN ($placeholders) AND status = 'active'");
+        $stmt->execute($serviceNames);
         $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($services) !== count($serviceIds)) {
+
+        if (count($services) !== count($serviceNames)) {
             throw new Exception('Some selected services are not available');
         }
         
@@ -365,8 +373,8 @@ function handleBookAppointment($input) {
         
         // Create appointment
         $stmt = $db->prepare("
-            INSERT INTO appointments (user_id, pet_id, appointment_date, appointment_time, estimated_duration, total_amount, special_instructions, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')
+            INSERT INTO appointments (user_id, pet_id, appointment_date, appointment_time, estimated_duration, total_amount, special_instructions, status, package_customizations)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', ?)
         ");
         $stmt->execute([
             $decoded->user_id,
@@ -375,11 +383,12 @@ function handleBookAppointment($input) {
             $input['preferredTime'],
             $totalDuration,
             $totalAmount,
-            $input['specialInstructions'] ?? null
+            $input['specialInstructions'] ?? null,
+            isset($input['packageCustomizations']) ? json_encode($input['packageCustomizations']) : null
         ]);
-        
+
         $appointmentId = $db->lastInsertId();
-        
+
         // Add appointment services
         $stmt = $db->prepare("INSERT INTO appointment_services (appointment_id, service_id, price) VALUES (?, ?, ?)");
         foreach ($services as $service) {
@@ -503,23 +512,23 @@ function handleUpdateAppointment($input) {
             $stmt->execute([$appointmentId]);
             
             // Get service prices and calculate total
-            $serviceIds = array_map('intval', $input['services']);
-            $placeholders = str_repeat('?,', count($serviceIds) - 1) . '?';
-            
-            $stmt = $db->prepare("SELECT id, price, duration_minutes FROM services WHERE id IN ($placeholders)");
-            $stmt->execute($serviceIds);
+            $serviceNames = $input['services'];
+            $placeholders = str_repeat('?,', count($serviceNames) - 1) . '?';
+
+            $stmt = $db->prepare("SELECT id, name, base_price as price, 30 as duration_minutes FROM services2 WHERE name IN ($placeholders) AND status = 'active'");
+            $stmt->execute($serviceNames);
             $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            if (count($services) !== count($serviceIds)) {
+
+            if (count($services) !== count($serviceNames)) {
                 throw new Exception('Some selected services are not available');
             }
             
             $totalAmount = array_sum(array_column($services, 'price'));
             $totalDuration = array_sum(array_column($services, 'duration_minutes'));
             
-            // Update appointment with new totals
-            $stmt = $db->prepare("UPDATE appointments SET total_amount = ?, estimated_duration = ? WHERE id = ?");
-            $stmt->execute([$totalAmount, $totalDuration, $appointmentId]);
+            // Update appointment with new totals and package customizations
+            $stmt = $db->prepare("UPDATE appointments SET total_amount = ?, estimated_duration = ?, package_customizations = ? WHERE id = ?");
+            $stmt->execute([$totalAmount, $totalDuration, isset($input['packageCustomizations']) ? json_encode($input['packageCustomizations']) : null, $appointmentId]);
             
             // Add new appointment services
             $stmt = $db->prepare("INSERT INTO appointment_services (appointment_id, service_id, price) VALUES (?, ?, ?)");
@@ -551,13 +560,14 @@ function handleGetAppointmentDetails() {
         $db = getDB();
         
         // Get appointment details
-        $stmt = $db->prepare("SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration, 
-                             a.total_amount, a.status, a.special_instructions, 
-                             p.id as pet_id, p.name as pet_name, p.type as pet_type, p.breed as pet_breed, 
-                             p.age_range as pet_age, p.size as pet_size 
-                             FROM appointments a 
-                             JOIN pets p ON a.pet_id = p.id 
-                             WHERE a.id = ? AND a.user_id = ?");
+        $stmt = $db->prepare("SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
+                              a.total_amount, a.status, a.special_instructions, a.package_customizations,
+                              p.id as pet_id, p.name as pet_name, p.type as pet_type, p.breed as pet_breed,
+                              p.age_range as pet_age, p.size as pet_size, p.last_vaccine_date, p.vaccine_types,
+                              p.custom_vaccine, p.vaccination_proof
+                              FROM appointments a
+                              JOIN pets p ON a.pet_id = p.id
+                              WHERE a.id = ? AND a.user_id = ?");
         $stmt->execute([$appointmentId, $decoded->user_id]);
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -566,9 +576,9 @@ function handleGetAppointmentDetails() {
         }
         
         // Get services for the appointment
-        $stmt = $db->prepare("SELECT s.id, s.name, s.category, aps.price 
-                             FROM appointment_services aps 
-                             JOIN services s ON aps.service_id = s.id 
+        $stmt = $db->prepare("SELECT s.id, s.name, s.category, aps.price
+                             FROM appointment_services aps
+                             JOIN services2 s ON aps.service_id = s.id
                              WHERE aps.appointment_id = ?");
         $stmt->execute([$appointmentId]);
         $appointment['services'] = $stmt->fetchAll(PDO::FETCH_ASSOC);

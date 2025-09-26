@@ -76,10 +76,10 @@
                 
                 <!-- Navigation -->
                 <nav class="hidden md:flex items-center space-x-6">
-                    <a href="#" onclick="showSection('tracking')" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">Track Pet</a>
-                    <a href="#" onclick="showSection('appointment')" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Book Appointment</a>
-                    <a href="#" onclick="showSection('my-appointments')" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">My Appointments</a>
-                    <a href="#" onclick="showSection('history')" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">History</a>
+                    <a href="customer_tracking.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Track Pet</a>
+                    <a href="customer_booking.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Book Appointment</a>
+                    <a href="customer_appointments.html" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">My Appointments</a>
+                    <a href="customer_history.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">History</a>
 
                     
                     <div class="border-l border-gray-300 pl-6 ml-2">
@@ -103,10 +103,10 @@
             <!-- Mobile Navigation -->
             <div id="mobileMenu" class="md:hidden hidden pb-4">
                 <div class="flex flex-col space-y-2">
-                    <a href="#" onclick="showSection('tracking')" class="mobile-nav-link text-gold-600 font-semibold py-2 transition-colors duration-200">Track Pet</a>
-                    <a href="#" onclick="showSection('appointment')" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Book Appointment</a>
-                    <a href="#" onclick="showSection('my-appointments')" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">My Appointments</a>
-                    <a href="#" onclick="showSection('history')" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">History</a>
+                    <a href="customer_tracking.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Track Pet</a>
+                    <a href="customer_booking.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Book Appointment</a>
+                    <a href="customer_appointments.html" class="mobile-nav-link text-gold-600 font-semibold py-2 transition-colors duration-200">My Appointments</a>
+                    <a href="customer_history.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">History</a>
 
                     <div class="border-t border-gray-300 pt-3 mt-3">
                         <button onclick="logout()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600 py-2 w-full text-left">
@@ -140,7 +140,7 @@
 
             <!-- Quick Actions -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <button onclick="showSection('tracking')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                <a href="customer_tracking.html" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover block">
                     <div class="w-16 h-16 bg-gradient-to-br from-gold-100 to-gold-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -148,9 +148,9 @@
                     </div>
                     <h3 class="font-semibold text-gray-900 mb-2">Track Pet</h3>
                     <p class="text-sm text-gray-600">Real-time RFID tracking</p>
-                </button>
-                
-                <button onclick="showSection('appointment')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                </a>
+
+                <a href="customer_booking.html" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover block">
                     <div class="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -158,9 +158,9 @@
                     </div>
                     <h3 class="font-semibold text-gray-900 mb-2">Book Appointment</h3>
                     <p class="text-sm text-gray-600">Schedule service</p>
-                </button>
-                
-                <button onclick="showSection('my-appointments')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                </a>
+
+                <a href="customer_appointments.html" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover block">
                     <div class="w-16 h-16 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
@@ -168,9 +168,9 @@
                     </div>
                     <h3 class="font-semibold text-gray-900 mb-2">My Appointments</h3>
                     <p class="text-sm text-gray-600">Manage bookings</p>
-                </button>
-                
-                <button onclick="showSection('history')" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover">
+                </a>
+
+                <a href="customer_history.html" class="bg-white/90 backdrop-blur-sm p-6 rounded-2xl card-shadow hover:shadow-xl transition-all duration-200 text-center btn-hover block">
                     <div class="w-16 h-16 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -178,11 +178,11 @@
                     </div>
                     <h3 class="font-semibold text-gray-900 mb-2">Service History</h3>
                     <p class="text-sm text-gray-600">Past appointments</p>
-                </button>
+                </a>
             </div>
 
             <!-- Content Sections -->
-            <div id="tracking" class="section">
+            <div id="tracking" class="section hidden">
                 <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
                     <div class="mb-8">
                         <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-3">
@@ -211,7 +211,7 @@
             </div>
 
             <!-- My Appointments Section -->
-            <div id="my-appointments" class="section hidden">
+            <div id="my-appointments" class="section">
                 <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-3">
@@ -222,7 +222,7 @@
                             </div>
                             My Appointments
                         </h2>
-                        <button onclick="showSection('appointment')" class="bg-gold-500 hover:bg-gold-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+                        <button onclick="window.location.href='customer_booking.html'" class="bg-gold-500 hover:bg-gold-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
                             Book New Appointment
                         </button>
                     </div>

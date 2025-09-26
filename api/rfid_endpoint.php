@@ -83,12 +83,15 @@ try {
             // Check if this is completion (tap 3 in the new system)
             if ($bookingResult['is_completion']) {
                 // Send completion/pickup email - NEW
-                error_log("RFID: Calling sendCompletionEmail for booking ID: " . $bookingResult['booking_id']);
+                error_log("RFID: TAP COUNT IS 3 - Calling sendCompletionEmail for booking ID: " . $bookingResult['booking_id']);
                 $emailSent = sendCompletionEmail($bookingResult['booking_id']);
                 error_log("RFID: sendCompletionEmail result: " . ($emailSent ? 'SUCCESS' : 'FAILED'));
+                if (!$emailSent) {
+                    error_log("RFID: sendCompletionEmail failed - checking if function exists: " . (function_exists('sendCompletionEmail') ? 'YES' : 'NO'));
+                }
             } else {
                 // Send regular status update email
-                error_log("RFID: Calling sendBookingStatusEmail for booking ID: " . $bookingResult['booking_id']);
+                error_log("RFID: TAP COUNT IS NOT 3 - Calling sendBookingStatusEmail for booking ID: " . $bookingResult['booking_id']);
                 $emailSent = sendBookingStatusEmail($bookingResult['booking_id']);
                 error_log("RFID: sendBookingStatusEmail result: " . ($emailSent ? 'SUCCESS' : 'FAILED'));
             }
@@ -201,7 +204,7 @@ function updateBookingStatus($db, $cardId, $input) {
     // UPDATED status mapping to 3 taps with new terminology
     $statusMap = [
         1 => 'checked-in',     // Step 1: Check-in
-        2 => 'in-progress',    // Step 2: Processing (general term)
+        2 => 'bathing',         // Step 2: Processing (bathing)
         3 => 'completed'       // Step 3: Complete & Ready for Pickup (completion)
     ];
     
@@ -272,7 +275,7 @@ function updateBookingStatus($db, $cardId, $input) {
     if ($tapCount === 1) {
         $notes = "Pet checked in via RFID tap #" . $tapCount;
     } elseif ($tapCount === 2) {
-        $notes = "Pet processing in progress via RFID tap #" . $tapCount;
+        $notes = "Pet bathing in progress via RFID tap #" . $tapCount;
     } elseif ($tapCount === 3) {
         $notes = "Service completed! Pet ready for pickup via RFID tap #" . $tapCount;
     }

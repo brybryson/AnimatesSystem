@@ -8,9 +8,36 @@ let rfidAssigned = false;
 let lastNotifiedError = null; // Track last error to prevent spam
 let servicesData = {};
 let currentPetSize = '';
-
 // API base URL - adjust this to your server location
 const API_BASE = 'http://localhost/animates/api/';
+
+// Package contents definitions (what services are included in each package)
+const packageContents = {
+    'Essential Grooming Package': [
+        { name: 'Bath & Dry', required: true },
+        { name: 'Nail Trimming & Grinding', required: false },
+        { name: 'Ear Cleaning & Inspection', required: false }
+    ],
+    'Full Grooming Package': [
+        { name: 'Bath & Dry', required: true },
+        { name: 'Haircut & Styling', required: false },
+        { name: 'Nail Trimming & Grinding', required: false },
+        { name: 'Ear Cleaning & Inspection', required: false },
+        { name: 'Teeth Cleaning', required: false },
+        { name: 'De-shedding Treatment', required: false }
+    ],
+    'Bath & Brush Package': [
+        { name: 'Bath & Dry', required: true },
+        { name: 'De-shedding Treatment', required: false }
+    ],
+    'Spa Relaxation Package': [
+        { name: 'Bath & Dry', required: true },
+        { name: 'Paw Balm', required: false },
+        { name: 'Scented Cologne', required: false }
+    ]
+};
+
+let packageCustomizations = {}; // Track package customizations
 
 
 // Add this function near the top of the file with other utility functions
@@ -31,7 +58,10 @@ function getPhysicalCardNumber(cardUID) {
 // Load services when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadServicesFromDatabase();
-    
+
+    // Initialize vaccination form handlers
+    initializeVaccinationHandlers();
+
     // Add event listener for pet size selection
     const petSizeSelect = document.getElementById('petSizeForPricing');
     petSizeSelect.addEventListener('change', function() {
@@ -47,7 +77,10 @@ async function loadServicesFromDatabase() {
     try {
         const response = await fetch(API_BASE + 'services.php?action=get_services');
         const result = await response.json();
-        
+
+        // Debug file upload
+        console.log('File upload debug:', result.debug_file_upload);
+
         if (result.success) {
             servicesData = result.services;
             renderServices();
@@ -91,19 +124,19 @@ function renderServices() {
     
     let html = '';
     
-    // Basic Services
+    // Basic Services (individual services)
     if (servicesData.basic && servicesData.basic.length > 0) {
-        html += renderServiceCategory('basic', 'Basic Services', 'blue', servicesData.basic);
+        html += renderServiceCategory('basic', '✂️ Basic Services', 'blue', servicesData.basic);
     }
-    
-    // Premium Services
-    if (servicesData.premium && servicesData.premium.length > 0) {
-        html += renderServiceCategory('premium', 'Premium Services', 'purple', servicesData.premium);
+
+    // Package Templates (starting points)
+    if (servicesData.package && Array.isArray(servicesData.package) && servicesData.package.length > 0) {
+        html += renderServiceCategory('package', '📦 Grooming Packages', 'purple', servicesData.package);
     }
-    
-    // Add-ons
+
+    // Add-ons (enhance any service)
     if (servicesData.addon && servicesData.addon.length > 0) {
-        html += renderServiceCategory('addon', 'Add-ons', 'green', servicesData.addon);
+        html += renderServiceCategory('addon', '🎀 Add-Ons & Finishing Touches', 'green', servicesData.addon);
     }
     
     container.innerHTML = html;
@@ -113,6 +146,213 @@ function renderServices() {
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', updateServiceSelection);
     });
+
+    // Package selection listeners (only if packages exist)
+    if (servicesData.package && Array.isArray(servicesData.package) && servicesData.package.length > 0) {
+        const packageCheckboxes = document.querySelectorAll('.package-checkbox');
+        packageCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', handlePackageSelection);
+        });
+
+        // Package item customization listeners
+        const packageItemCheckboxes = document.querySelectorAll('.package-item-checkbox');
+        packageItemCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', handlePackageItemToggle);
+        });
+    }
+}
+
+function handlePackageSelection(event) {
+    const checkbox = event.target;
+    const packageId = checkbox.dataset.packageId;
+    const serviceName = checkbox.dataset.service;
+    const basePrice = parseFloat(checkbox.dataset.basePrice);
+
+    // Update package customization state
+    packageCustomizations[packageId].selected = checkbox.checked;
+
+    // If unchecking package, reset customizations and remove from selectedServices
+    if (!checkbox.checked) {
+        packageCustomizations[packageId].excludedServices = [];
+        // Remove the package from selectedServices
+        selectedServices = selectedServices.filter(s => s.name !== serviceName && s.name !== `${serviceName} (Customized)`);
+    } else {
+        // Check if this package conflicts with any already selected packages
+        const conflictingPackage = selectedServices.find(s =>
+            s.name.includes('Package') &&
+            s.name !== serviceName &&
+            s.name !== `${serviceName} (Customized)` &&
+            serviceConflicts[serviceName]?.includes(s.name.replace(' (Customized)', ''))
+        );
+
+        // If there's a conflicting package, remove it first
+        if (conflictingPackage) {
+            selectedServices = selectedServices.filter(s => s !== conflictingPackage);
+            // Also update the conflicting package's customization state
+            Object.keys(packageCustomizations).forEach(pkgId => {
+                const pkgCheckbox = document.querySelector(`[data-package-id="${pkgId}"]`);
+                if (pkgCheckbox && pkgCheckbox.dataset.service === conflictingPackage.name.replace(' (Customized)', '')) {
+                    packageCustomizations[pkgId].selected = false;
+                    packageCustomizations[pkgId].excludedServices = [];
+                }
+            });
+        }
+
+        // Add the package to selectedServices if not already there
+        const existingPackage = selectedServices.find(s => s.id === parseInt(checkbox.dataset.serviceId));
+        if (!existingPackage) {
+            // Calculate customized price
+            let customizedPrice = basePrice;
+            packageCustomizations[packageId].excludedServices.forEach(() => {
+                const exclusionDiscount = basePrice * 0.15;
+                customizedPrice -= exclusionDiscount;
+            });
+            customizedPrice = Math.max(customizedPrice, basePrice * 0.6);
+
+            selectedServices.push({
+                id: parseInt(checkbox.dataset.serviceId),
+                name: `${serviceName} (Customized)`,
+                price: customizedPrice,
+                customizations: {
+                    selected: true,
+                    excludedServices: packageCustomizations[packageId].excludedServices,
+                    includedServices: packageContents[serviceName].filter(item => !packageCustomizations[packageId].excludedServices.includes(item.name)).map(item => item.name)
+                }
+            });
+        }
+    }
+
+    // Update order summary
+    updateOrderSummary();
+
+    // Then re-render services to show updated package
+    renderServices();
+
+    // Ensure selectedServices is consistent with the UI and handle conflicts
+    updateServiceSelection();
+}
+
+function handlePackageItemToggle(event) {
+    const checkbox = event.target;
+    const packageId = checkbox.dataset.packageId;
+    const serviceName = checkbox.dataset.serviceName;
+
+    if (!checkbox.checked) {
+        // Add to excluded services
+        if (!packageCustomizations[packageId].excludedServices.includes(serviceName)) {
+            packageCustomizations[packageId].excludedServices.push(serviceName);
+        }
+    } else {
+        // Remove from excluded services
+        packageCustomizations[packageId].excludedServices =
+            packageCustomizations[packageId].excludedServices.filter(name => name !== serviceName);
+    }
+
+    // Update service selection to handle conflicts after customization changes
+    updateServiceSelection();
+
+    // Then re-render services to update pricing
+    renderServices();
+}
+
+function renderCustomizablePackage(service, colors) {
+    const packageName = service.name;
+    const packageItems = packageContents[packageName] || [];
+    const basePrice = getServicePrice(service);
+    const packageId = `package-${service.id}`;
+
+    // Initialize package customization if not exists
+    if (!packageCustomizations[packageId]) {
+        packageCustomizations[packageId] = {
+            selected: false,
+            excludedServices: []
+        };
+    }
+
+    const customization = packageCustomizations[packageId];
+    const includedServices = packageItems.filter(item => !customization.excludedServices.includes(item.name));
+    const excludedServices = packageItems.filter(item => customization.excludedServices.includes(item.name));
+
+    // Safety check - if no package items defined, return empty
+    if (packageItems.length === 0) {
+        return '';
+    }
+
+    // Calculate customized price
+    let customizedPrice = basePrice;
+    if (customization.selected) {
+        // Subtract price of excluded services (simplified calculation)
+        excludedServices.forEach(excluded => {
+            // Estimate exclusion discount (this is simplified)
+            const exclusionDiscount = basePrice * 0.15; // 15% per excluded service
+            customizedPrice -= exclusionDiscount;
+        });
+        customizedPrice = Math.max(customizedPrice, basePrice * 0.6); // Minimum 60% of base price
+    }
+
+    let priceDisplay = '';
+    if (service.is_size_based && currentPetSize && basePrice > 0) {
+        priceDisplay = customization.selected && excludedServices.length > 0
+            ? `₱${basePrice.toFixed(2)} → ₱${customizedPrice.toFixed(2)}`
+            : `₱${basePrice.toFixed(2)}`;
+    } else {
+        priceDisplay = 'Select pet size first';
+    }
+
+    let html = `
+        <div class="bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 hover:shadow-md">
+            <label class="flex items-center p-4 cursor-pointer">
+                <input type="checkbox" class="package-checkbox w-5 h-5 text-primary rounded"
+                       data-package-id="${packageId}"
+                       data-service-id="${service.id}"
+                       data-service="${service.name}"
+                       data-base-price="${basePrice}"
+                       ${customization.selected ? 'checked' : ''}>
+                <div class="ml-4 flex-1 flex justify-between items-center">
+                    <div>
+                        <span class="font-medium text-gray-900">${service.name}</span>
+                        <p class="text-sm text-gray-600">${service.description}</p>
+                        <p class="text-xs text-gray-500 mt-1">Click to customize package contents</p>
+                    </div>
+                    <span class="text-lg font-bold text-primary">${priceDisplay}</span>
+                </div>
+            </label>`;
+
+    // Show package contents when selected
+    if (customization.selected) {
+        html += `
+            <div class="px-4 pb-4 border-t border-gray-200 mt-2 pt-3">
+                <p class="text-sm font-medium text-gray-700 mb-3">Customize your package:</p>
+                <div class="space-y-2">`;
+
+        packageItems.forEach(item => {
+            const isExcluded = customization.excludedServices.includes(item.name);
+            const isRequired = item.required;
+
+            html += `
+                <label class="flex items-center text-sm">
+                    <input type="checkbox"
+                           class="package-item-checkbox w-4 h-4 text-primary rounded"
+                           data-package-id="${packageId}"
+                           data-service-name="${item.name}"
+                           ${!isExcluded ? 'checked' : ''}
+                           ${isRequired ? 'disabled' : ''}>
+                    <span class="ml-2 ${isRequired ? 'text-gray-600' : isExcluded ? 'line-through text-gray-400' : 'text-gray-700'}">
+                        ${item.name} ${isRequired ? '(required)' : ''}
+                    </span>
+                </label>`;
+        });
+
+        html += `
+                </div>
+                ${excludedServices.length > 0 ? `<p class="text-xs text-amber-600 mt-2">Price adjusted for excluded services</p>` : ''}
+            </div>`;
+    }
+
+    html += `
+        </div>`;
+
+    return html;
 }
 
 function renderServiceCategory(categoryKey, categoryTitle, color, services) {
@@ -164,65 +404,68 @@ function renderServiceCategory(categoryKey, categoryTitle, color, services) {
     `;
     
    services.forEach(service => {
-    const price = getServicePrice(service);
-    let priceDisplay = '';
-    let isDisabled = false;
-    
-    if (service.is_size_based && currentPetSize && price > 0) {
-        // Size-based service with selected size - show specific price
-        priceDisplay = `₱${price.toFixed(2)}`;
-        isDisabled = false;
-    } else if (service.is_size_based && !currentPetSize) {
-        // Size-based service without selected size - show base price if available
-        if (service.base_price && service.base_price > 0) {
-            priceDisplay = `From ₱${service.base_price.toFixed(2)}`;
-        } else {
-            // Find the lowest price from available pricing
-            const prices = Object.values(service.pricing || {});
-            if (prices.length > 0) {
-                const minPrice = Math.min(...prices);
-                priceDisplay = `From ₱${minPrice.toFixed(2)}`;
-            } else {
-                priceDisplay = 'Select pet size first';
-            }
-        }
-        isDisabled = true; // Disable until size is selected
-    } else if (!service.is_size_based) {
-        // Fixed price service - always show price and enable
-        if (price > 0) {
+    // Handle package services differently - show with customization options
+    if (categoryKey === 'package') {
+        html += renderCustomizablePackage(service, colors);
+    } else {
+        // Regular service rendering
+        const price = getServicePrice(service);
+        let priceDisplay = '';
+        let isDisabled = false;
+
+        if (service.is_size_based && currentPetSize && price > 0) {
             priceDisplay = `₱${price.toFixed(2)}`;
             isDisabled = false;
-        } else if (service.base_price && service.base_price > 0) {
-            priceDisplay = `₱${service.base_price.toFixed(2)}`;
-            isDisabled = false;
+        } else if (service.is_size_based && !currentPetSize) {
+            if (service.base_price && service.base_price > 0) {
+                priceDisplay = `From ₱${service.base_price.toFixed(2)}`;
+            } else {
+                const prices = Object.values(service.pricing || {});
+                if (prices.length > 0) {
+                    const minPrice = Math.min(...prices);
+                    priceDisplay = `From ₱${minPrice.toFixed(2)}`;
+                } else {
+                    priceDisplay = 'Select pet size first';
+                }
+            }
+            isDisabled = true;
+        } else if (!service.is_size_based) {
+            if (price > 0) {
+                priceDisplay = `₱${price.toFixed(2)}`;
+                isDisabled = false;
+            } else if (service.base_price && service.base_price > 0) {
+                priceDisplay = `₱${service.base_price.toFixed(2)}`;
+                isDisabled = false;
+            } else {
+                priceDisplay = 'Price not available';
+                isDisabled = true;
+            }
         } else {
-            priceDisplay = 'Price not available';
+            priceDisplay = 'Select pet size first';
             isDisabled = true;
         }
-    } else {
-        // Fallback case
-        priceDisplay = 'Select pet size first';
-        isDisabled = true;
-    }
-    
-    html += `
-        <label class="flex items-center p-4 bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 cursor-pointer hover:shadow-md ${isDisabled ? 'opacity-60' : ''}">
-            <input type="checkbox" class="service-checkbox w-5 h-5 text-primary rounded" 
-                   data-service-id="${service.id}"
-                   data-service="${service.name}" 
-                   data-price="${price}"
-                   ${isDisabled ? 'disabled' : ''}>
-            <div class="ml-4 flex-1 flex justify-between items-center">
-                <div>
-                    <span class="font-medium text-gray-900">${service.name}</span>
-                    <p class="text-sm text-gray-600">${service.description}</p>
-                    ${service.is_size_based ? `<p class="text-xs text-gray-500 mt-1">Size-based pricing</p>` : ''}
-                    ${isDisabled && service.is_size_based ? `<p class="text-xs text-amber-600 mt-1">Please select pet size above</p>` : ''}
+
+        const isChecked = selectedServices.some(s => s.id === service.id);
+        html += `
+            <label class="flex items-center p-4 bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 cursor-pointer hover:shadow-md ${isDisabled ? 'opacity-60' : ''}">
+                <input type="checkbox" class="service-checkbox w-5 h-5 text-primary rounded"
+                        data-service-id="${service.id}"
+                        data-service="${service.name}"
+                        data-price="${price}"
+                        ${isDisabled ? 'disabled data-original-disabled="true"' : ''}
+                        ${isChecked ? 'checked' : ''}>
+                <div class="ml-4 flex-1 flex justify-between items-center">
+                    <div>
+                        <span class="font-medium text-gray-900">${service.name}</span>
+                        <p class="text-sm text-gray-600">${service.description}</p>
+                        ${service.is_size_based ? `<p class="text-xs text-gray-500 mt-1">Size-based pricing</p>` : ''}
+                        ${isDisabled && service.is_size_based ? `<p class="text-xs text-amber-600 mt-1">Please select pet size above</p>` : ''}
+                    </div>
+                    <span class="text-lg font-bold text-primary">${priceDisplay}</span>
                 </div>
-                <span class="text-lg font-bold text-primary">${priceDisplay}</span>
-            </div>
-        </label>
-    `;
+            </label>
+        `;
+    }
 });
     
     html += `
@@ -260,9 +503,46 @@ function getServicePrice(service) {
 
 
 // Step navigation
-function nextStep() {
+async function nextStep() {
     if (currentStep === 1) {
         if (validatePetInfo()) {
+            // Upload vaccination proof immediately if provided
+            if (petData.vaccinationProof && petData.vaccinationProof instanceof File) {
+                console.log('File detected, starting upload...');
+                try {
+                    const formData = new FormData();
+                    formData.append('vaccinationProof', petData.vaccinationProof);
+                    formData.append('action', 'upload_vaccination_proof');
+
+                    console.log('Sending upload request...');
+                    const response = await fetch(API_BASE + 'check_in.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    console.log('Upload response status:', response.status);
+                    const result = await response.json();
+                    console.log('Upload result:', result);
+
+                    if (result.success && result.file_path) {
+                        // Store the file path for later use
+                        petData.vaccinationProofPath = result.file_path;
+                        console.log('Vaccination proof uploaded successfully:', result.file_path);
+                        showNotification('Vaccination proof uploaded successfully', 'success');
+                    } else {
+                        console.error('Upload failed:', result);
+                        showNotification('Failed to upload vaccination proof: ' + (result.error || 'Unknown error'), 'error');
+                        return; // Don't proceed if upload fails
+                    }
+                } catch (error) {
+                    console.error('Error uploading vaccination proof:', error);
+                    showNotification('Error uploading vaccination proof: ' + error.message, 'error');
+                    return; // Don't proceed if upload fails
+                }
+            } else {
+                console.log('No vaccination proof to upload');
+            }
+
             goToStep(2);
         }
     } else if (currentStep === 2) {
@@ -272,10 +552,12 @@ function nextStep() {
             document.getElementById('petSizeForPricing').focus();
             return;
         }
-        
+
         if (selectedServices.length > 0) {
             goToStep(3);
             startRFIDAssignment();
+        } else {
+            showNotification('Please select at least one service', 'warning');
         }
     }
 }
@@ -332,9 +614,9 @@ function updateProgress(step) {
 }
 
 function validatePetInfo() {
-    const required = ['petName', 'petType', 'ownerName', 'ownerPhone', 'ownerEmail'];
+    const required = ['petName', 'petType', 'ownerName', 'ownerPhone', 'ownerEmail', 'lastVaccineDate'];
     let isValid = true;
-    
+
     required.forEach(field => {
         const input = document.getElementById(field);
         if (!input.value.trim()) {
@@ -346,50 +628,56 @@ function validatePetInfo() {
         }
     });
 
-    // Handle custom pet type for "others"
-    const petType = document.getElementById('petType').value;
-    if (petType === 'others') {
-        const customPetType = document.getElementById('customPetType');
-        if (!customPetType.value.trim()) {
-            customPetType.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            customPetType.classList.remove('border-red-500');
-            petData.petType = customPetType.value.trim();
-        }
+    // Special validation for vaccination proof file
+    const vaccinationProofInput = document.getElementById('vaccinationProof');
+    if (!vaccinationProofInput.files || vaccinationProofInput.files.length === 0) {
+        // Vaccination proof is required, so fail validation if not provided
+        vaccinationProofInput.classList.add('border-red-500');
+        isValid = false;
+    } else {
+        vaccinationProofInput.classList.remove('border-red-500');
+        // File is already stored in petData.vaccinationProof from the upload handler
     }
 
+    // No custom pet type handling needed (removed "others" option)
+
     // Validate pet breed
-    let breedValue = '';
-    
-    if (petType === 'others') {
-        const customBreed = document.getElementById('petBreedCustom');
-        if (!customBreed.value.trim()) {
-            customBreed.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            customBreed.classList.remove('border-red-500');
-            breedValue = customBreed.value.trim();
-        }
+    const breedSelect = document.getElementById('petBreed');
+    if (!breedSelect.value) {
+        breedSelect.classList.add('border-red-500');
+        isValid = false;
     } else {
-        const breedSelect = document.getElementById('petBreed');
-        if (!breedSelect.value) {
-            breedSelect.classList.add('border-red-500');
-            isValid = false;
-        } else {
-            breedSelect.classList.remove('border-red-500');
-            breedValue = breedSelect.value;
-        }
+        breedSelect.classList.remove('border-red-500');
+        petData.petBreed = breedSelect.value;
     }
-    
-    if (breedValue) {
-        petData.petBreed = breedValue;
+
+    // Validate vaccine type selection
+    const vaccineTypeSelect = document.getElementById('vaccineType');
+    const selectedVaccine = vaccineTypeSelect.value;
+    if (!selectedVaccine) {
+        vaccineTypeSelect.classList.add('border-red-500');
+        isValid = false;
+    } else {
+        vaccineTypeSelect.classList.remove('border-red-500');
+        petData.vaccineTypes = [selectedVaccine]; // Store as array for consistency
+
+        // Check if "others" is selected and custom vaccine is provided
+        if (selectedVaccine === 'others') {
+            const customVaccineInput = document.getElementById('customVaccine');
+            if (!customVaccineInput.value.trim()) {
+                customVaccineInput.classList.add('border-red-500');
+                isValid = false;
+            } else {
+                customVaccineInput.classList.remove('border-red-500');
+                petData.customVaccine = customVaccineInput.value.trim();
+            }
+        }
     }
 
     // Store optional fields (petAge only, remove petSize)
     petData.petAge = document.getElementById('petAge').value;
     petData.specialNotes = document.getElementById('specialNotes').value;
-    
+
     return isValid;
 }
 
@@ -401,39 +689,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     petTypeSelect.addEventListener('change', async function() {
         const petType = this.value;
-        const customPetTypeContainer = document.getElementById('customPetTypeContainer');
-        const customPetTypeInput = document.getElementById('customPetType');
-        
-        if (petType === 'others') {
-            customPetTypeContainer.classList.remove('hidden');
-            customPetTypeInput.required = true;
-            
-            petBreedSelect.classList.add('hidden');
-            petBreedCustom.classList.remove('hidden');
-            petBreedSelect.disabled = true;
-            petBreedCustom.required = true;
-            petBreedSelect.required = false;
+
+        if (petType) {
+            petBreedSelect.classList.remove('hidden');
+            petBreedSelect.disabled = false;
+            petBreedSelect.required = true;
+
+            await loadBreeds(petType);
         } else {
-            customPetTypeContainer.classList.add('hidden');
-            customPetTypeInput.required = false;
-            customPetTypeInput.value = '';
-            
-            if (petType) {
-                petBreedSelect.classList.remove('hidden');
-                petBreedCustom.classList.add('hidden');
-                petBreedSelect.disabled = false;
-                petBreedCustom.required = false;
-                petBreedSelect.required = true;
-                
-                await loadBreeds(petType);
-            } else {
-                petBreedSelect.classList.remove('hidden');
-                petBreedCustom.classList.add('hidden');
-                petBreedSelect.disabled = true;
-                petBreedCustom.required = false;
-                petBreedSelect.required = false;
-                petBreedSelect.innerHTML = '<option value="">First select pet type</option>';
-            }
+            petBreedSelect.disabled = true;
+            petBreedSelect.required = false;
+            petBreedSelect.innerHTML = '<option value="">First select pet type</option>';
         }
     });
 
@@ -487,23 +753,223 @@ async function loadBreeds(petType) {
     }
 }
 
-// Handle service selection with decimal support
+// Handle service selection with decimal support and granular mutual exclusion logic
 function updateServiceSelection() {
+    // Preserve previously selected services that are still valid
+    const previousSelectedServices = [...selectedServices];
     selectedServices = [];
     totalAmount = 0;
-    
-    document.querySelectorAll('.service-checkbox:checked').forEach(checkbox => {
+
+    // Get all checked regular service checkboxes
+    const checkedBoxes = document.querySelectorAll('.service-checkbox:checked');
+
+    // Get selected packages with customizations
+    const selectedPackages = Object.entries(packageCustomizations)
+        .filter(([packageId, customization]) => customization.selected)
+        .map(([packageId, customization]) => {
+            const checkbox = document.querySelector(`[data-package-id="${packageId}"]`);
+            if (checkbox) {
+                const basePrice = parseFloat(checkbox.dataset.basePrice);
+                const packageItems = packageContents[checkbox.dataset.service] || [];
+                const includedServices = packageItems.filter(item =>
+                    !customization.excludedServices.includes(item.name)
+                );
+
+                // Calculate customized price
+                let customizedPrice = basePrice;
+                customization.excludedServices.forEach(() => {
+                    const exclusionDiscount = basePrice * 0.15; // 15% per excluded service
+                    customizedPrice -= exclusionDiscount;
+                });
+                customizedPrice = Math.max(customizedPrice, basePrice * 0.6); // Minimum 60% of base price
+
+                return {
+                    id: parseInt(checkbox.dataset.serviceId),
+                    name: `${checkbox.dataset.service} (Customized)`,
+                    price: customizedPrice,
+                    customizations: {
+                        ...customization,
+                        includedServices: packageItems.filter(item =>
+                            !customization.excludedServices.includes(item.name)
+                        ).map(item => item.name)
+                    }
+                };
+            }
+            return null;
+        }).filter(pkg => pkg !== null);
+
+    // Track selected services by name for conflict checking
+    const selectedServiceNames = new Set();
+
+    // Add regular services - preserve previously selected ones that are still checked
+    checkedBoxes.forEach(checkbox => {
         const service = {
             id: parseInt(checkbox.dataset.serviceId),
             name: checkbox.dataset.service,
             price: parseFloat(checkbox.dataset.price)
         };
         selectedServices.push(service);
+        selectedServiceNames.add(service.name);
         totalAmount += service.price;
     });
-    
+
+    // Add customized packages
+    selectedPackages.forEach(pkg => {
+        selectedServices.push(pkg);
+        selectedServiceNames.add(pkg.name.split(' (Customized)')[0]); // Add base package name for conflicts
+        totalAmount += pkg.price;
+    });
+
+    // Define service conflicts for customizable package system
+    const serviceConflicts = {
+        // Package conflicts (only one package allowed at a time - all packages include Bath & Dry)
+        'Essential Grooming Package': ['Full Grooming Package', 'Bath & Brush Package', 'Spa Relaxation Package'],
+        'Full Grooming Package': ['Essential Grooming Package', 'Bath & Brush Package', 'Spa Relaxation Package'],
+        'Bath & Brush Package': ['Essential Grooming Package', 'Full Grooming Package', 'Spa Relaxation Package'],
+        'Spa Relaxation Package': ['Essential Grooming Package', 'Full Grooming Package', 'Bath & Brush Package'],
+
+        // Individual service conflicts (prevent duplicate/conflicting individual services)
+        'Bath & Dry': ['Bath & Dry'], // Prevent duplicate selection
+        'Nail Trimming & Grinding': ['Nail Trimming & Grinding'],
+        'Ear Cleaning & Inspection': ['Ear Cleaning & Inspection'],
+        'Haircut & Styling': ['Haircut & Styling'],
+        'Teeth Cleaning': ['Teeth Cleaning'],
+        'De-shedding Treatment': ['De-shedding Treatment'],
+
+        // Add-ons can be combined with anything (no conflicts)
+        'Extra Nail Polish': [],
+        'Scented Cologne': [],
+        'Bow or Bandana': [],
+        'Paw Balm': [],
+        'Whitening Shampoo': [],
+        'Flea & Tick Treatment': []
+    };
+
+    // Apply granular mutual exclusion logic for regular services
+    document.querySelectorAll('.service-checkbox').forEach(checkbox => {
+        const serviceContainer = checkbox.closest('.bg-gradient-to-r');
+        if (serviceContainer) {
+            const categoryTitle = serviceContainer.querySelector('h3').textContent;
+            const serviceName = checkbox.dataset.service;
+
+            // Skip add-ons - they can always be selected
+            if (categoryTitle === '🎀 Add-Ons & Finishing Touches') {
+                if (!checkbox.hasAttribute('data-original-disabled')) {
+                    checkbox.disabled = false;
+                    checkbox.closest('label').classList.remove('opacity-50', 'cursor-not-allowed');
+                    checkbox.closest('label').classList.add('cursor-pointer');
+                }
+                return;
+            }
+
+            let isConflicted = false;
+
+            // Check conflicts with other individual services first
+            for (const selectedName of selectedServiceNames) {
+                if (!selectedName.includes('Package') && !selectedName.includes(' (Customized)')) {
+                    if (serviceConflicts[serviceName]?.includes(selectedName)) {
+                        isConflicted = true;
+                        break;
+                    }
+                    if (serviceConflicts[selectedName]?.includes(serviceName)) {
+                        isConflicted = true;
+                        break;
+                    }
+                }
+            }
+
+            // Check if this basic service is included in any selected package
+            if (!isConflicted && categoryTitle === '✂️ Basic Services') {
+                for (const pkg of selectedPackages) {
+                    const packageName = pkg.name.replace(' (Customized)', '');
+                    const pkgContents = packageContents[packageName] || [];
+                    const includedServices = pkgContents.filter(item =>
+                        !pkg.customizations.excludedServices.includes(item.name)
+                    );
+
+                    if (includedServices.some(s => s.name === serviceName)) {
+                        isConflicted = true;
+                        break;
+                    }
+                }
+            }
+
+            // Never disable a service that is already checked
+            if (checkbox.checked) {
+                isConflicted = false;
+            }
+
+            if (isConflicted && !checkbox.checked) {
+                // Disable conflicting service
+                checkbox.disabled = true;
+                checkbox.closest('label').classList.add('opacity-50', 'cursor-not-allowed');
+                checkbox.closest('label').classList.remove('cursor-pointer');
+            } else if (!checkbox.hasAttribute('data-original-disabled')) {
+                // Re-enable service if no conflicts and not originally disabled
+                checkbox.disabled = false;
+                checkbox.closest('label').classList.remove('opacity-50', 'cursor-not-allowed');
+                checkbox.closest('label').classList.add('cursor-pointer');
+            }
+        }
+    });
+
+    // Apply package conflicts - disable packages that contain already selected basic services
+    if (servicesData.package && Array.isArray(servicesData.package) && servicesData.package.length > 0) {
+        document.querySelectorAll('.package-checkbox').forEach(checkbox => {
+            const packageName = checkbox.dataset.service;
+            const packageContainer = checkbox.closest('.bg-white\\/80');
+
+            let isConflicted = false;
+
+            // Check conflicts with other packages first
+            for (const selectedName of selectedServiceNames) {
+                if (selectedName.includes('Package') && selectedName !== packageName && !selectedName.includes(' (Customized)')) {
+                    if (serviceConflicts[packageName]?.includes(selectedName)) {
+                        isConflicted = true;
+                        break;
+                    }
+                    if (serviceConflicts[selectedName]?.includes(packageName)) {
+                        isConflicted = true;
+                        break;
+                    }
+                }
+            }
+
+            // Check if this package contains any already selected basic services
+            if (!isConflicted) {
+                const pkgContents = packageContents[packageName] || [];
+
+                for (const service of pkgContents) {
+                    // Check if this service is already selected as a basic service
+                    const basicServiceCheckbox = document.querySelector(`.service-checkbox[data-service="${service.name}"]`);
+                    if (basicServiceCheckbox && basicServiceCheckbox.checked) {
+                        isConflicted = true;
+                        break;
+                    }
+                }
+            }
+
+            // Never disable a package that is already checked
+            if (checkbox.checked) {
+                isConflicted = false;
+            }
+
+            if (isConflicted && !checkbox.checked) {
+                // Disable conflicting package
+                checkbox.disabled = true;
+                packageContainer.classList.add('opacity-50', 'cursor-not-allowed');
+                packageContainer.classList.remove('cursor-pointer');
+            } else {
+                // Re-enable package if no conflicts
+                checkbox.disabled = false;
+                packageContainer.classList.remove('opacity-50', 'cursor-not-allowed');
+                packageContainer.classList.add('cursor-pointer');
+            }
+        });
+    }
+
     updateOrderSummary();
-    
+
     // Enable/disable next button
     const nextBtn = document.getElementById('servicesNextBtn');
     if (selectedServices.length > 0) {
@@ -524,18 +990,59 @@ function updateServiceSelection() {
 function updateOrderSummary() {
     const servicesContainer = document.getElementById('selectedServices');
     const totalElement = document.getElementById('totalAmount');
-    
+
     if (selectedServices.length === 0) {
         servicesContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No services selected</p>';
     } else {
-        servicesContainer.innerHTML = selectedServices.map(service => 
-            `<div class="flex justify-between items-center">
-                <span>${service.name}</span>
-                <span class="font-semibold">₱${service.price.toFixed(2)}</span>
-            </div>`
-        ).join('');
+        let html = '';
+
+        selectedServices.forEach(service => {
+            // Check if this is a customized package
+            if (service.customizations && service.customizations.selected) {
+                const packageName = service.name.replace(' (Customized)', '');
+                const packageItems = packageContents[packageName] || [];
+                const includedServices = packageItems.filter(item =>
+                    !service.customizations.excludedServices.includes(item.name)
+                );
+                const excludedServices = packageItems.filter(item =>
+                    service.customizations.excludedServices.includes(item.name)
+                );
+
+                // Show package header
+                html += `<div class="flex justify-between items-center font-medium text-gray-900 border-b border-gray-200 pb-1 mb-2">
+                    <span>${packageName} (Customized)</span>
+                    <span>₱${service.price.toFixed(2)}</span>
+                </div>`;
+
+                // Show included services
+                includedServices.forEach(item => {
+                    html += `<div class="flex justify-between items-center text-sm ml-4 text-green-700">
+                        <span>✓ ${item.name}</span>
+                        <span class="text-xs">(included)</span>
+                    </div>`;
+                });
+
+                // Show excluded services
+                excludedServices.forEach(item => {
+                    html += `<div class="flex justify-between items-center text-sm ml-4 text-gray-400 line-through">
+                        <span>✗ ${item.name}</span>
+                        <span class="text-xs">(excluded)</span>
+                    </div>`;
+                });
+
+                html += '<div class="mb-3"></div>'; // Spacing between packages
+            } else {
+                // Regular service
+                html += `<div class="flex justify-between items-center">
+                    <span>${service.name}</span>
+                    <span class="font-semibold">₱${service.price.toFixed(2)}</span>
+                </div>`;
+            }
+        });
+
+        servicesContainer.innerHTML = html;
     }
-    
+
     totalElement.textContent = `₱${totalAmount.toFixed(2)}`;
 }
 
@@ -705,31 +1212,88 @@ async function completeBooking() {
         
         showNotification('Creating booking and sending confirmation email...', 'info');
         
-        const bookingData = {
-            petName: petData.petName,
-            petType: petData.petType,
-            petBreed: petData.petBreed,
-            petAge: petData.petAge,
-            petSize: petData.petSize,
-            selectedPetSize: currentPetSize || petData.selectedPetSize, // Add the size used for pricing
-            ownerName: petData.ownerName,
-            ownerPhone: petData.ownerPhone,
-            ownerEmail: petData.ownerEmail,
-            specialNotes: petData.specialNotes,
-            services: selectedServices,
-            totalAmount: parseFloat(totalAmount.toFixed(2)),
-            customRFID: petData.rfidTag
-        };
+        // Prepare package customizations data
+        const packageCustomizationsData = {};
+        Object.entries(packageCustomizations).forEach(([packageId, customization]) => {
+            if (customization.selected) {
+                // Find the package name by matching the packageId
+                let packageName = null;
+                for (const [name, contents] of Object.entries(packageContents)) {
+                    // Check if this package exists in servicesData
+                    const serviceData = servicesData.package?.find(p => p.name === name);
+                    if (serviceData && `package-${serviceData.id}` === packageId) {
+                        packageName = name;
+                        break;
+                    }
+                }
 
-        console.log('Sending booking data:', bookingData);
+                if (packageName) {
+                    packageCustomizationsData[packageName] = {
+                        selected: true,
+                        excludedServices: customization.excludedServices,
+                        includedServices: packageContents[packageName]
+                            .filter(item => !customization.excludedServices.includes(item.name))
+                            .map(item => item.name)
+                    };
+                }
+            }
+        });
+
+        // Create FormData for file upload support
+        const formData = new FormData();
+
+        // Map pet size values to match database expectations
+        let mappedPetSize = currentPetSize || petData.petSize;
+        if (mappedPetSize === 'extra_large') {
+            mappedPetSize = 'xlarge';
+        }
+
+        // Add all booking data
+        formData.append('petName', petData.petName);
+        formData.append('petType', petData.petType);
+        formData.append('petBreed', petData.petBreed);
+        formData.append('petAge', petData.petAge);
+        formData.append('petSize', mappedPetSize); // Use mapped size value
+        formData.append('selectedPetSize', currentPetSize || petData.selectedPetSize);
+        formData.append('ownerName', petData.ownerName);
+        formData.append('ownerPhone', petData.ownerPhone);
+        formData.append('ownerEmail', petData.ownerEmail);
+        formData.append('specialNotes', petData.specialNotes || '');
+        formData.append('lastVaccineDate', petData.lastVaccineDate);
+        formData.append('vaccineTypes', JSON.stringify(petData.vaccineTypes));
+        formData.append('customVaccine', petData.customVaccine || '');
+        formData.append('services', JSON.stringify(selectedServices));
+        formData.append('packageCustomizations', JSON.stringify(packageCustomizationsData));
+        formData.append('totalAmount', parseFloat(totalAmount.toFixed(2)));
+        formData.append('customRFID', petData.rfidTag);
+
+        // Add vaccination proof path if it was uploaded earlier
+        if (petData.vaccinationProofPath) {
+            formData.append('vaccinationProofPath', petData.vaccinationProofPath);
+        }
+
+        console.log('Sending booking data with FormData');
         console.log('API URL:', API_BASE + 'check_in.php');
+
+        // Debug: Log FormData contents
+        for (let [key, value] of formData.entries()) {
+            if (value instanceof File) {
+                console.log(key + ': File(' + value.name + ', ' + value.size + ' bytes)');
+            } else {
+                console.log(key + ': ' + value);
+            }
+        }
+
+        // Log vaccination proof status
+        if (petData.vaccinationProofPath) {
+            console.log('Using pre-uploaded vaccination proof:', petData.vaccinationProofPath);
+        } else {
+            console.log('No vaccination proof uploaded');
+        }
 
        const response = await fetch(API_BASE + 'check_in.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(bookingData)
+            body: formData
         });
 
         // Check if response is actually JSON before parsing
@@ -794,15 +1358,46 @@ function updateBookingSummary() {
     document.getElementById('summaryPetDetails').textContent = `${petData.petType} - ${petData.petBreed}${petData.petAge ? ` • ${petData.petAge}` : ''}${currentPetSize ? ` • ${currentPetSize}` : ''}`;
     document.getElementById('summaryOwnerName').textContent = petData.ownerName;
     document.getElementById('summaryOwnerContact').textContent = `${petData.ownerPhone}${petData.ownerEmail ? ` • ${petData.ownerEmail}` : ''}`;
-    
+
     const servicesContainer = document.getElementById('summaryServices');
-    servicesContainer.innerHTML = selectedServices.map(service => 
-        `<div class="flex justify-between items-center text-sm">
-            <span>${service.name}</span>
-            <span>₱${service.price.toFixed(2)}</span>
-        </div>`
-    ).join('');
-    
+    let servicesHtml = '';
+
+    selectedServices.forEach(service => {
+        // Check if this is a customized package
+        if (service.customizations && service.customizations.selected) {
+            const packageName = service.name.replace(' (Customized)', '');
+            const includedServices = service.customizations.includedServices || [];
+
+            // Show package header
+            servicesHtml += `<div class="font-medium text-gray-900 border-b border-gray-200 pb-1 mb-2">
+                ${packageName} (Customized)
+            </div>`;
+
+            // Show included services
+            includedServices.forEach(serviceName => {
+                servicesHtml += `<div class="flex justify-between items-center text-sm ml-4 text-green-700 mb-1">
+                    <span>✓ ${serviceName}</span>
+                    <span class="text-xs">(included)</span>
+                </div>`;
+            });
+
+            // Show package price
+            servicesHtml += `<div class="flex justify-between items-center text-sm font-medium mt-2 pt-2 border-t border-gray-100">
+                <span>${packageName} Total</span>
+                <span>₱${service.price.toFixed(2)}</span>
+            </div>`;
+
+            servicesHtml += '<div class="mb-3"></div>';
+        } else {
+            // Regular service
+            servicesHtml += `<div class="flex justify-between items-center text-sm">
+                <span>${service.name}</span>
+                <span>₱${service.price.toFixed(2)}</span>
+            </div>`;
+        }
+    });
+
+    servicesContainer.innerHTML = servicesHtml;
     document.getElementById('summaryTotal').textContent = `₱${totalAmount.toFixed(2)}`;
 }
 
@@ -813,34 +1408,8 @@ function redirectToPortal() {
 }
 
 function startNewBooking() {
-    // Reset all data
-    currentStep = 1;
-    selectedServices = [];
-    totalAmount = 0;
-    petData = {};
-    bookingId = null;
-    rfidAssigned = false;
-    
-    // Stop any ongoing RFID polling
-    stopRFIDPolling();
-    
-    // Reset form
-    document.getElementById('petInfoForm').reset();
-    document.querySelectorAll('.service-checkbox').forEach(cb => cb.checked = false);
-    updateOrderSummary();
-    
-    // Reset breed fields
-    document.getElementById('petBreed').innerHTML = '<option value="">First select pet type</option>';
-    document.getElementById('petBreed').disabled = true;
-    document.getElementById('petBreedCustom').classList.add('hidden');
-    document.getElementById('petBreed').classList.remove('hidden');
-    
-    // Reset custom pet type field
-    document.getElementById('customPetTypeContainer').classList.add('hidden');
-    document.getElementById('customPetType').value = '';
-    
-    // Go back to step 1
-    goToStep(1);
+    // Force a complete page reload to ensure clean state
+    window.location.reload();
 }
 
 // Update the existing showNotification function
@@ -1096,14 +1665,135 @@ function generatePDFReceipt() {
     doc.save(fileName);
 }
 
-// Handle form submission for step 1
-document.getElementById('petInfoForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    nextStep();
-});
 
 // Initialize progress
 updateProgress(1);
+
+// Initialize vaccination form handlers
+function initializeVaccinationHandlers() {
+    // Vaccine type multi-select change handler
+    const vaccineTypeSelect = document.getElementById('vaccineType');
+    if (vaccineTypeSelect) {
+        vaccineTypeSelect.addEventListener('change', handleVaccineTypeChange);
+    }
+
+    // Vaccination proof file upload handler
+    const vaccinationProofInput = document.getElementById('vaccinationProof');
+    if (vaccinationProofInput) {
+        vaccinationProofInput.addEventListener('change', handleVaccinationProofUpload);
+    }
+}
+
+// Handle vaccine type selection changes
+function handleVaccineTypeChange() {
+    const vaccineTypeSelect = document.getElementById('vaccineType');
+    const customVaccineContainer = document.getElementById('customVaccineContainer');
+    const customVaccineInput = document.getElementById('customVaccine');
+
+    if (!vaccineTypeSelect || !customVaccineContainer || !customVaccineInput) return;
+
+    const selectedValue = vaccineTypeSelect.value;
+    const hasOthers = selectedValue === 'others';
+
+    if (hasOthers) {
+        customVaccineContainer.classList.remove('hidden');
+        customVaccineInput.required = true;
+    } else {
+        customVaccineContainer.classList.add('hidden');
+        customVaccineInput.required = false;
+        customVaccineInput.value = '';
+    }
+}
+
+// Handle vaccination proof file upload
+function handleVaccinationProofUpload(event) {
+    const input = event.target;
+    const file = input.files[0];
+    const uploadArea = document.getElementById('uploadArea');
+    const previewArea = document.getElementById('previewArea');
+    const vaccinationPreview = document.getElementById('vaccinationPreview');
+
+    console.log('File upload triggered, file:', file);
+
+    if (!file) {
+        console.log('No file selected');
+        // Reset to upload area
+        uploadArea.classList.remove('hidden');
+        previewArea.classList.add('hidden');
+        return;
+    }
+
+    console.log('File selected:', file.name, 'Type:', file.type, 'Size:', file.size);
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+        console.log('Invalid file type:', file.type);
+        showNotification('Please select a valid image file (JPG, PNG, GIF) or PDF.', 'error');
+        input.value = '';
+        return;
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+        console.log('File too large:', file.size);
+        showNotification('File size must be less than 10MB.', 'error');
+        input.value = '';
+        return;
+    }
+
+    // Store file data for form submission
+    petData.vaccinationProof = file;
+
+    // Show file information
+    const fileNameElement = document.getElementById('fileName');
+    const fileSizeElement = document.getElementById('fileSize');
+
+    fileNameElement.textContent = file.name;
+    fileSizeElement.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+
+    // Show preview for images
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            vaccinationPreview.src = e.target.result;
+            vaccinationPreview.classList.remove('hidden');
+            uploadArea.classList.add('hidden');
+            previewArea.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // For PDFs and other files, just show file info
+        vaccinationPreview.classList.add('hidden');
+        uploadArea.classList.add('hidden');
+        previewArea.classList.remove('hidden');
+    }
+
+    console.log('File upload successful');
+    showNotification('Vaccination proof uploaded successfully.', 'success');
+}
+
+// Remove vaccination proof
+function removeVaccinationProof() {
+    const vaccinationProofInput = document.getElementById('vaccinationProof');
+    const uploadArea = document.getElementById('uploadArea');
+    const previewArea = document.getElementById('previewArea');
+    const vaccinationPreview = document.getElementById('vaccinationPreview');
+
+    vaccinationProofInput.value = '';
+    uploadArea.classList.remove('hidden');
+    previewArea.classList.add('hidden');
+
+    // Clear stored file data
+    petData.vaccinationProof = null;
+
+    // Clear preview
+    vaccinationPreview.src = '';
+    vaccinationPreview.classList.add('hidden');
+
+    showNotification('Vaccination proof removed.', 'info');
+}
 
 // Phone number formatting
 document.getElementById('ownerPhone').addEventListener('input', function(e) {
