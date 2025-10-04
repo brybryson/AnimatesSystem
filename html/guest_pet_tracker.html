@@ -203,22 +203,39 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-3">Need Help Finding Your Tracking ID?</h3>
-                <p class="text-gray-600 mb-6">Don't worry! We're here to help you get back on track.</p>
+                <h3 class="text-xl font-bold text-gray-900 mb-3">Can't Find Your Tracking ID?</h3>
+                <p class="text-gray-600 mb-6">Don't worry! Here are some options to help you track your pet.</p>
             </div>
 
-            <div class="text-center">
+            <div class="grid md:grid-cols-2 gap-6">
                 <!-- Create New Booking -->
-                <div class="bg-gradient-to-r from-primary/5 to-secondary/5 border border-primary/20 rounded-lg p-6 inline-block">
-                    <div class="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full mb-4">
-                        <i class="fas fa-plus text-primary text-lg"></i>
+                <div class="bg-gradient-to-r from-primary/5 to-secondary/5 border border-primary/20 rounded-lg p-6">
+                    <div class="text-center">
+                        <div class="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full mb-4">
+                            <i class="fas fa-plus text-primary text-lg"></i>
+                        </div>
+                        <h4 class="font-semibold text-gray-900 mb-3">New Customer?</h4>
+                        <p class="text-gray-600 text-sm mb-4">Create a new booking and get your tracking ID</p>
+                        <a href="check_in.html" class="inline-flex items-center px-6 py-3 bg-primary hover:bg-gold-600 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                            <i class="fas fa-plus mr-2"></i>
+                            Create New Booking
+                        </a>
                     </div>
-                    <h4 class="font-semibold text-gray-900 mb-3">New Customer?</h4>
-                    <p class="text-gray-600 text-sm mb-4">Create a new booking and get your tracking ID</p>
-                    <a href="check_in.html" class="inline-flex items-center px-6 py-3 bg-primary hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                        <i class="fas fa-plus mr-2"></i>
-                        Create New Booking
-                    </a>
+                </div>
+
+                <!-- Existing Customer Login -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                    <div class="text-center">
+                        <div class="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
+                            <i class="fas fa-sign-in-alt text-blue-600 text-lg"></i>
+                        </div>
+                        <h4 class="font-semibold text-gray-900 mb-3">Existing Customer?</h4>
+                        <p class="text-gray-600 text-sm mb-4">Sign in to your account to access your bookings</p>
+                        <a href="auth.html" class="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                            <i class="fas fa-sign-in-alt mr-2"></i>
+                            Login to Account
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -231,7 +248,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div class="text-center text-sm text-gray-500">
                 <p>&copy; 2025 Animates PH - Camaro Branch. Professional Pet Care Services.</p>
-                <p class="mt-2">📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567 | 📧 info@animates.ph.fairview@gmail.com</p>
+                <p class="mt-2">📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567 | 📧 animates.ph.fairview@gmail.com</p>
             </div>
         </div>
     </footer>

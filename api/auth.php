@@ -19,44 +19,56 @@ function handleCreateUser($input) {
         requireAdmin();
         $db = getDB();
         // Validate inputs from admin form
-        $required = ['first_name','last_name','email','role'];
+        $required = ['first_name','last_name','email','phone','address','role','password'];
         foreach ($required as $f) { if (empty(trim($input[$f] ?? ''))) throw new Exception(ucfirst(str_replace('_',' ', $f)).' is required'); }
-        if (!filter_var($input['email'], FILTER_VALIDATE_EMAIL)) { throw new Exception('Invalid email'); }
-        if (!in_array($input['role'], ['admin','staff','cashier','customer'])) { throw new Exception('Invalid role'); }
-        if ($input['role'] === 'staff') {
-            $validStaff = ['cashier','receptionist','groomer','bather','manager'];
-            if (!in_array(($input['staff_role'] ?? ''), $validStaff)) { throw new Exception('Invalid staff role'); }
+
+        // Validate first and last name (only letters and spaces)
+        if (!preg_match('/^[A-Za-z\s]+$/', $input['first_name'])) { throw new Exception('First name can only contain letters and spaces'); }
+        if (!preg_match('/^[A-Za-z\s]+$/', $input['last_name'])) { throw new Exception('Last name can only contain letters and spaces'); }
+
+        // Validate email format (must contain @ and end with .com)
+        if (!preg_match('/.+@.+\.com$/', $input['email'])) { throw new Exception('Email must contain @ and end with .com'); }
+
+        // Validate phone number (must start with 09 and be exactly 11 digits)
+        if (!preg_match('/^09\d{9}$/', $input['phone'])) { throw new Exception('Phone number must start with 09 and be exactly 11 digits'); }
+
+        // Validate password strength
+        $password = $input['password'];
+        if (strlen($password) < 8 ||
+            !preg_match('/[a-z]/', $password) ||
+            !preg_match('/[A-Z]/', $password) ||
+            !preg_match('/\d/', $password) ||
+            !preg_match('/[@$!%*?&]/', $password)) {
+            throw new Exception('Password must be at least 8 characters with uppercase, lowercase, number and special character');
         }
+
+        if (!in_array($input['role'], ['admin','manager','cashier'])) { throw new Exception('Invalid role'); }
+
         $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
         $stmt->execute([$input['email']]);
         if ($stmt->fetch()) { throw new Exception('Email already exists'); }
-        $password = $input['password'] ?? bin2hex(random_bytes(4));
-        if (strlen($password) < 8) { $password = $password . 'A1!a'; }
+
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
         $fullName = trim(($input['first_name'] ?? '').' '.($input['last_name'] ?? ''));
         $username = $input['username'] ?? explode('@', $input['email'])[0];
-        // Determine role to persist; map staff+staff_role=cashier to top-level cashier
-        $incomingRole = $input['role'];
-        $incomingStaffRole = $input['staff_role'] ?? null;
-        $roleToSave = ($incomingRole === 'cashier')
-            ? 'cashier'
-            : (($incomingRole === 'staff' && $incomingStaffRole === 'cashier') ? 'cashier' : $incomingRole);
 
-        // Insert using current schema columns
-        $stmt = $db->prepare("INSERT INTO users (full_name,email,role,username,password,is_active) VALUES (?,?,?,?,?,1)");
+        // Insert using updated schema columns
+        $stmt = $db->prepare("INSERT INTO users (full_name,email,phone,address,birthdate,role,username,password,is_active) VALUES (?,?,?,?,?,?,?,?,1)");
         $stmt->execute([
             $fullName,
             $input['email'],
-            // Persist resolved role
-            $roleToSave,
+            $input['phone'],
+            $input['address'],
+            $input['birthdate'] ?: null,
+            $input['role'],
             $username,
             $passwordHash
         ]);
         $newUserId = $db->lastInsertId();
-        $check = $db->prepare("SELECT id, full_name, email, role, is_active, username FROM users WHERE id = ?");
+        $check = $db->prepare("SELECT id, full_name, email, phone, address, birthdate, role, is_active, username FROM users WHERE id = ?");
         $check->execute([$newUserId]);
         $createdUser = $check->fetch(PDO::FETCH_ASSOC);
-        echo json_encode(['success'=>true,'message'=>'User created','temporary_password'=>$input['password'] ? null : $password,'user'=>$createdUser]);
+        echo json_encode(['success'=>true,'message'=>'User created','user'=>$createdUser]);
         exit;
     } catch (Exception $e) {
         http_response_code(400);
@@ -70,12 +82,12 @@ function handleListUsers($input) {
         requireAdmin();
         $db = getDB();
         $role = $input['filter_role'] ?? null;
-        $validRoles = ['admin','cashier','staff','customer'];
+        $validRoles = ['admin','cashier','staff','customer','manager'];
         if ($role && in_array($role, $validRoles, true)) {
-            $stmt = $db->prepare("SELECT id,full_name,email,role,is_active,username FROM users WHERE role = ? ORDER BY id DESC");
+            $stmt = $db->prepare("SELECT id,full_name,email,phone,address,birthdate,role,is_active,username FROM users WHERE role = ? ORDER BY id DESC");
             $stmt->execute([$role]);
         } else {
-            $stmt = $db->query("SELECT id,full_name,email,role,is_active,username FROM users ORDER BY id DESC");
+            $stmt = $db->query("SELECT id,full_name,email,phone,address,birthdate,role,is_active,username FROM users ORDER BY id DESC");
         }
         echo json_encode(['success'=>true,'users'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
@@ -190,6 +202,156 @@ function handleGetProfile() {
                 'role' => $user['role'],
                 'username' => $user['username']
             ]
+        ]);
+        exit;
+
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+function handleGetUserDetails($input) {
+    try {
+        requireAdmin();
+        $db = getDB();
+        $userId = (int)($input['user_id'] ?? 0);
+        if (!$userId) throw new Exception('user_id is required');
+
+        $stmt = $db->prepare("SELECT id, full_name, email, phone, address, birthdate, role, username FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            throw new Exception('User not found');
+        }
+
+        // Split full_name into first and last name
+        $nameParts = explode(' ', $user['full_name'], 2);
+        $firstName = $nameParts[0] ?? '';
+        $lastName = $nameParts[1] ?? '';
+
+        echo json_encode([
+            'success' => true,
+            'user' => [
+                'id' => $user['id'],
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'email' => $user['email'],
+                'phone' => $user['phone'],
+                'address' => $user['address'],
+                'birthdate' => $user['birthdate'],
+                'role' => $user['role'],
+                'username' => $user['username']
+            ]
+        ]);
+        exit;
+
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+function handleUpdateUser($input) {
+    try {
+        requireAdmin();
+        $db = getDB();
+        $userId = (int)($input['user_id'] ?? 0);
+        if (!$userId) throw new Exception('user_id is required');
+
+        // Build update query dynamically
+        $updateFields = [];
+        $params = [];
+
+        if (isset($input['first_name']) && isset($input['last_name'])) {
+            $fullName = trim($input['first_name'] . ' ' . $input['last_name']);
+            if (!empty($fullName)) {
+                $updateFields[] = "full_name = ?";
+                $params[] = $fullName;
+            }
+        }
+
+        if (isset($input['phone'])) {
+            $updateFields[] = "phone = ?";
+            $params[] = $input['phone'] ?: null;
+        }
+
+        if (isset($input['address'])) {
+            $updateFields[] = "address = ?";
+            $params[] = $input['address'] ?: null;
+        }
+
+        if (empty($updateFields)) {
+            throw new Exception('No fields to update');
+        }
+
+        $params[] = $userId;
+        $stmt = $db->prepare("UPDATE users SET " . implode(", ", $updateFields) . " WHERE id = ?");
+        $stmt->execute($params);
+
+        // Return updated user
+        $stmt = $db->prepare("SELECT id, full_name, email, phone, address, birthdate, role, username FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $updatedUser = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'user' => $updatedUser
+        ]);
+        exit;
+
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+function handleDeleteUser($input) {
+    try {
+        requireAdmin();
+        $db = getDB();
+        $userId = (int)($input['user_id'] ?? 0);
+        if (!$userId) throw new Exception('user_id is required');
+
+        // Check if user exists
+        $stmt = $db->prepare("SELECT id, full_name, role FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            throw new Exception('User not found');
+        }
+
+        // Prevent deletion of admin users (optional safety measure)
+        if ($user['role'] === 'admin') {
+            // Check if this is the last admin
+            $adminCount = $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+            if ($adminCount <= 1) {
+                throw new Exception('Cannot delete the last admin user');
+            }
+        }
+
+        // Delete the user (this will cascade delete related records if foreign keys are set up)
+        $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'User permanently deleted',
+            'deleted_user' => $user['full_name']
         ]);
         exit;
 
@@ -322,6 +484,15 @@ if ($method === 'POST') {
             break;
         case 'get_profile':
             handleGetProfile();
+            break;
+        case 'get_user_details':
+            handleGetUserDetails($input);
+            break;
+        case 'update_user':
+            handleUpdateUser($input);
+            break;
+        case 'delete_user':
+            handleDeleteUser($input);
             break;
         default:
             http_response_code(400);

@@ -82,7 +82,7 @@ function showSection(sectionId) {
         initializeAppointments();
     } else if (sectionId === 'my-appointments') {
         console.log('DEBUG: Switching to my-appointments section, loading appointments');
-        // Load user appointments when switching to my-appointments section
+        // Load user's appointments when switching to my-appointments section
         loadUserAppointments();
     }
 }
@@ -120,10 +120,29 @@ async function checkAuth() {
         console.log('DEBUG: Token verification result:', result);
 
         if (result.success) {
-            currentUser = {
-                id: result.user_id,
-                email: result.email
-            };
+            // Get user profile to include full name
+            const profileResponse = await fetch(`${API_BASE}auth.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ action: 'get_profile' })
+            });
+
+            const profileResult = await profileResponse.json();
+            if (profileResult.success) {
+                currentUser = {
+                    id: result.user_id,
+                    email: result.email,
+                    name: profileResult.user.name
+                };
+            } else {
+                currentUser = {
+                    id: result.user_id,
+                    email: result.email
+                };
+            }
 
             console.log('DEBUG: Checking user role');
             // Verify user has customer role
@@ -159,7 +178,8 @@ function updateUserWelcome() {
     const welcomeElement = document.getElementById('userWelcome');
     const welcomeMobileElement = document.getElementById('userWelcomeMobile');
     if (currentUser) {
-        const welcomeText = `Welcome, ${currentUser.email}`;
+        const displayName = currentUser.name || currentUser.email;
+        const welcomeText = `Welcome, ${displayName}`;
         if (welcomeElement) welcomeElement.textContent = welcomeText;
         if (welcomeMobileElement) welcomeMobileElement.textContent = welcomeText;
     }
@@ -2364,6 +2384,29 @@ async function loadUserAppointments() {
     }
 }
 
+// Load all appointments (for customer_appointments.html)
+async function loadAllAppointments() {
+    try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`${API_BASE}appointments.php?action=get_all_appointments`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayAllAppointments(result.appointments);
+        } else {
+            showNotification('Error loading appointments', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading all appointments:', error);
+        showNotification('Error loading appointments', 'error');
+    }
+}
+
 // Display user appointments
 function displayUserAppointments(appointments) {
     const container = document.getElementById('appointmentsContainer');
@@ -2379,6 +2422,9 @@ function displayUserAppointments(appointments) {
         return;
     }
 
+    // Get current user name for display
+    const currentUserName = currentUser ? (currentUser.name || currentUser.email) : 'You';
+
     container.innerHTML = `
         <div class="space-y-4">
             ${appointments.map(appointment => `
@@ -2387,7 +2433,7 @@ function displayUserAppointments(appointments) {
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">🐾</div>
                             <div>
-                                <h3 class="font-semibold text-gray-900 text-lg">${appointment.pet_name}</h3>
+                                <h3 class="font-semibold text-gray-900 text-lg">${appointment.pet_name} • ${currentUserName}</h3>
                                 <p class="text-sm text-gray-600">${appointment.pet_type} • ${appointment.pet_breed}</p>
                             </div>
                         </div>
@@ -2404,12 +2450,24 @@ function displayUserAppointments(appointments) {
                                 <div class="w-3 h-3 rounded-full ${getStatusColorCircle(appointment.status)}"></div>
                                 <div class="text-sm font-medium text-gray-900 capitalize">${appointment.status}</div>
                             </div>
+                            ${appointment.status === 'cancelled' && appointment.cancelled_by_name ? `
+                                <div class="text-xs text-gray-600 mt-1">
+                                    Cancelled by ${appointment.cancelled_by_name}
+                                </div>
+                            ` : ''}
                         </div>
                         <div class="bg-primary/10 rounded p-3">
                             <div class="text-xs text-primary uppercase tracking-wide">Total Amount</div>
                             <div class="text-lg font-bold text-primary">₱${parseFloat(appointment.total_amount).toFixed(2)}</div>
                         </div>
                     </div>
+
+                    ${appointment.status === 'cancelled' && appointment.cancellation_remarks ? `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                            <div class="text-xs text-red-600 uppercase tracking-wide font-medium mb-2">Cancellation Reason</div>
+                            <div class="text-sm text-red-800">${appointment.cancellation_remarks}</div>
+                        </div>
+                    ` : ''}
 
                     <div class="flex items-center justify-between">
                         <div class="text-sm text-gray-600">
@@ -2429,6 +2487,95 @@ function displayUserAppointments(appointments) {
                     </div>
                 </div>
             `).join('')}
+        </div>
+    `;
+}
+
+// Display all appointments (for customer_appointments.html)
+function displayAllAppointments(appointments) {
+    const container = document.getElementById('appointmentsContainer');
+
+    if (!appointments || appointments.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <div class="text-4xl mb-4">🐾</div>
+                <p class="text-gray-500 text-lg">No appointments found</p>
+                <p class="text-gray-400 text-sm mt-2">All appointments will appear here</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Get current user ID from stored data
+    const currentUserId = currentUser ? currentUser.id : null;
+
+    container.innerHTML = `
+        <div class="space-y-4">
+            ${appointments.map(appointment => {
+                // Check if this appointment belongs to the current user and is in scheduled status
+                const isCurrentUserAppointment = appointment.user_id == currentUserId;
+                const canCancel = isCurrentUserAppointment && appointment.status === 'scheduled';
+
+                return `
+                <div class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">🐾</div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900 text-lg">${appointment.pet_name} • ${appointment.owner_name}</h3>
+                                <p class="text-sm text-gray-600">${appointment.pet_type} • ${appointment.pet_breed}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500 mb-1">${formatAppointmentDate(appointment.appointment_date)}</div>
+                            <div class="text-sm font-medium text-gray-700">${formatAppointmentTime(appointment.appointment_time)}</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="bg-gray-50 rounded p-3">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide">Status</div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 rounded-full ${getStatusColorCircle(appointment.status)}"></div>
+                                <div class="text-sm font-medium text-gray-900 capitalize">${appointment.status}</div>
+                            </div>
+                            ${appointment.status === 'cancelled' && appointment.cancelled_by_name ? `
+                                <div class="text-xs text-gray-600 mt-1">
+                                    Cancelled by ${appointment.cancelled_by_name}
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="bg-primary/10 rounded p-3">
+                            <div class="text-xs text-primary uppercase tracking-wide">Total Amount</div>
+                            <div class="text-lg font-bold text-primary">₱${parseFloat(appointment.total_amount).toFixed(2)}</div>
+                        </div>
+                    </div>
+
+                    ${appointment.status === 'cancelled' && appointment.cancellation_remarks ? `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                            <div class="text-xs text-red-600 uppercase tracking-wide font-medium mb-2">Cancellation Reason</div>
+                            <div class="text-sm text-red-800">${appointment.cancellation_remarks}</div>
+                        </div>
+                    ` : ''}
+
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-gray-600">
+                            <span class="font-medium">Services:</span>
+                            <span>${appointment.services ? appointment.services.map(s => s.name).join(', ') : 'None'}</span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="viewAppointmentDetails('${appointment.id}')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200">
+                                View Details
+                            </button>
+                            ${canCancel ? `
+                                <button onclick="cancelAppointment('${appointment.id}')" class="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200">
+                                    Cancel
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `}).join('')}
         </div>
     `;
 }
@@ -2587,6 +2734,29 @@ async function loadUserAppointmentsWithFilter(status = 'all') {
 
         if (result.success) {
             displayUserAppointments(result.appointments);
+        } else {
+            showNotification('Error loading appointments', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading filtered appointments:', error);
+        showNotification('Error loading appointments', 'error');
+    }
+}
+
+// Load all appointments with status filter
+async function loadAllAppointmentsWithFilter(status = 'all') {
+    try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`${API_BASE}appointments.php?action=get_all_appointments&status=${status}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayAllAppointments(result.appointments);
         } else {
             showNotification('Error loading appointments', 'error');
         }
@@ -3005,7 +3175,7 @@ async function confirmCancelAppointment(appointmentId) {
 
         if (result.success) {
             showNotification('Appointment cancelled successfully', 'success');
-            loadUserAppointments(); // Reload appointments
+            loadUserAppointments(); // Reload user appointments
             closeModal('cancelAppointmentModal');
         } else {
             showNotification('Error cancelling appointment', 'error');

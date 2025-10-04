@@ -3,766 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PetCare Pro - RFID Grooming Management</title>
+    <title>Animates - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-
-        header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-        }
-
-        .logo {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #667eea;
-            display: flex;
-            align-items: center;
-        }
-
-        .logo::before {
-            content: "🐕";
-            margin-right: 10px;
-        }
-
-        .nav-links {
-            display: flex;
-            list-style: none;
-            gap: 2rem;
-        }
-
-        .nav-links a {
-            text-decoration: none;
-            color: #333;
-            font-weight: 500;
-            transition: color 0.3s ease;
-            position: relative;
-        }
-
-        .nav-links a:hover {
-            color: #667eea;
-        }
-
-        .nav-links a.active::after {
-            content: '';
-            position: absolute;
-            bottom: -5px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: #667eea;
-        }
-
-        .main-content {
-            background: white;
-            margin: 2rem auto;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-            min-height: 80vh;
-        }
-
-        .page {
-            display: none;
-            padding: 2rem;
-        }
-
-        .page.active {
-            display: block;
-        }
-
-        .page-header {
-            text-align: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid #f0f0f0;
-        }
-
-        .page-header h1 {
-            color: #333;
-            margin-bottom: 0.5rem;
-            font-size: 2.5rem;
-        }
-
-        .page-header p {
-            color: #666;
-            font-size: 1.1rem;
-        }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .card {
-            background: linear-gradient(135deg, #f8f9ff 0%, #e8eeff 100%);
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        }
-
-        .card h3 {
-            color: #667eea;
-            margin-bottom: 1rem;
-            font-size: 1.3rem;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            padding: 0.3rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin: 0.2rem;
-        }
-
-        .status-waiting { background: #fff3cd; color: #856404; }
-        .status-bathing { background: #cce5ff; color: #0066cc; }
-        .status-grooming { background: #ffe6cc; color: #cc6600; }
-        .status-ready { background: #d4edda; color: #155724; }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: #333;
-        }
-
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.8rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-secondary {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            color: #333;
-        }
-
-        .pet-list {
-            display: grid;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .pet-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            background: #f8f9ff;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-
-        .pet-info h4 {
-            margin-bottom: 0.5rem;
-            color: #333;
-        }
-
-        .pet-info p {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        .rfid-scanner {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 15px;
-            text-align: center;
-            margin: 2rem 0;
-        }
-
-        .rfid-status {
-            font-size: 1.2rem;
-            margin: 1rem 0;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
-            text-align: center;
-            border-top: 3px solid #667eea;
-        }
-
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #667eea;
-            display: block;
-        }
-
-        .workflow-steps {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin: 2rem 0;
-        }
-
-        .workflow-step {
-            background: #f8f9ff;
-            padding: 1.5rem;
-            border-radius: 10px;
-            text-align: center;
-            border: 2px dashed #667eea;
-            transition: all 0.3s ease;
-        }
-
-        .workflow-step:hover {
-            background: #e8eeff;
-            border-style: solid;
-        }
-
-        .step-number {
-            background: #667eea;
-            color: white;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1rem;
-            font-weight: bold;
-        }
-
-        @media (max-width: 768px) {
-            .nav-links {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .container {
-                padding: 0 10px;
-            }
-        }
+        body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+        .gradient-bg { background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
+        .card-shadow { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        .btn-hover { transition: all 0.3s ease; }
+        .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(212, 175, 55, 0.4); }
     </style>
 </head>
-<body>
-    <header>
-        <div class="container">
-            <nav>
-                <div class="logo"> 8Paws Boutique & Grooming Salon </div>
-                <ul class="nav-links">
-                    <li><a href="dashboard.html" onclick="showPage('dashboard')" class="nav-link active">Dashboard</a></li>
-                    <li><a href="staff_dashboard.html" onclick="showPage('staff')" class="nav-link">Staff Management</a></li>
-                    <li><a href="reports.html" onclick="showPage('reports')" class="nav-link">Reports</a></li>
+<body class="gradient-bg min-h-screen flex flex-col">
+    <!-- Decorative background elements -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-gold-200/30 to-gold-300/20 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-gold-100/30 to-gold-200/20 rounded-full blur-3xl"></div>
+    </div>
 
-                </ul>
-            </nav>
+    <header class="relative bg-white/80 backdrop-blur-sm shadow-sm border-b border-gold-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-gold-200 rounded-full blur-sm"></div>
+                        <img src="../animates_logo.png" alt="Animates Logo" class="relative h-14 w-14 object-contain">
+                    </div>
+                    <div>
+                        <p class="text-lg font-semibold text-gold-700">Animates PH</p>
+                        <p class="text-sm text-gold-600 font-medium">Camaro Branch</p>
+                        <p class="text-xs text-gray-500">Dashboard</p>
+                    </div>
+                </div>
+                <!-- Navigation -->
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="dashboard.html" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">Dashboard</a>
+                </nav>
+
+                <!-- Mobile menu button -->
+                <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Mobile Navigation -->
+            <div id="mobileMenu" class="md:hidden hidden pb-4">
+                <div class="flex flex-col space-y-2">
+                    <a href="dashboard.html" class="mobile-nav-link text-gold-600 font-semibold py-2">Dashboard</a>
+                </div>
+            </div>
         </div>
     </header>
 
-    <div class="container">
-        <div class="main-content">
+    <main class="relative flex-grow px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-7xl mx-auto">
+            <!-- Page Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+                <p class="text-gray-600">Real-time overview of your grooming operations</p>
+            </div>
+
             <!-- Dashboard Page -->
             <div id="dashboard" class="page active">
-                <div class="page-header">
-                    <h1>Dashboard</h1>
-                    <p>Real-time overview of your grooming operations</p>
+
+                <!-- Enhanced Quick Stats -->
+                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6 mb-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Statistics
+                        </h3>
+                        <!-- Period Filter Buttons -->
+                        <div class="flex gap-2">
+                            <button id="filter-today" class="px-4 py-2 text-sm font-medium rounded-lg bg-gold-500 text-white hover:bg-gold-600 transition-colors active-filter">Today</button>
+                            <button id="filter-week" class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">This Week</button>
+                            <button id="filter-month" class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">This Month</button>
+                            <button id="filter-year" class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">This Year</button>
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                            <div class="text-2xl font-bold text-blue-700" id="totalPets">-</div>
+                            <div class="text-sm text-blue-600 font-medium">Pets Today</div>
+                        </div>
+                        <div class="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
+                            <div class="text-2xl font-bold text-orange-700" id="inProgress">-</div>
+                            <div class="text-sm text-orange-600 font-medium">In Progress</div>
+                        </div>
+                        <div class="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
+                            <div class="text-2xl font-bold text-green-700" id="completed">-</div>
+                            <div class="text-sm text-green-600 font-medium">Completed</div>
+                        </div>
+                        <div class="text-center p-4 bg-gradient-to-br from-gold-50 to-gold-100 rounded-xl border border-gold-200">
+                            <div class="text-2xl font-bold text-gold-700" id="revenue">-</div>
+                            <div class="text-sm text-gold-600 font-medium">Today's Revenue</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <span class="stat-number" id="totalPets">12</span>
-                        <span>Pets Today</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="inProgress">4</span>
-                        <span>In Progress</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="completed">8</span>
-                        <span>Completed</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="revenue">₱2,450</span>
-                        <span>Today's Revenue</span>
-                    </div>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <h3>📍 Current Status</h3>
-                        <div class="pet-list">
-                            <div class="pet-item">
-                                <div class="pet-info">
-                                    <h4>Snowy (Shih Tzu)</h4>
-                                    <p>RFID: A1B2C3D4 • Owner: Maria Santos</p>
+                <!-- 2-Column Layout -->
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <!-- Left Column -->
+                    <div class="space-y-6">
+                        <!-- Current Status Section -->
+                        <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6">
+                            <div class="flex items-center mb-6">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full mr-4">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
                                 </div>
-                                <span class="status-indicator status-grooming">Grooming</span>
+                                <div>
+                                    <h3 class="text-xl font-bold text-gray-900">Current Status</h3>
+                                    <p class="text-sm text-gray-600">Active grooming sessions</p>
+                                </div>
                             </div>
-                            <div class="pet-item">
-                                <div class="pet-info">
-                                    <h4>Buddy (Golden Retriever)</h4>
-                                    <p>RFID: B2C3D4E5 • Owner: John Cruz</p>
+                            <div class="space-y-4">
+                                <div class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <div class="font-semibold text-gray-900">Snowy (Shih Tzu)</div>
+                                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">Grooming</span>
+                                            </div>
+                                            <div class="text-sm text-gray-600">RFID: A1B2C3D4 • Owner: Maria Santos</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <span class="status-indicator status-bathing">Bathing</span>
-                            </div>
-                            <div class="pet-item">
-                                <div class="pet-info">
-                                    <h4>Luna (Persian Cat)</h4>
-                                    <p>RFID: C3D4E5F6 • Owner: Anna Reyes</p>
+                                <div class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <div class="font-semibold text-gray-900">Buddy (Golden Retriever)</div>
+                                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">Bathing</span>
+                                            </div>
+                                            <div class="text-sm text-gray-600">RFID: B2C3D4E5 • Owner: John Cruz</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <span class="status-indicator status-ready">Ready for Pickup</span>
+                                <div class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <div class="font-semibold text-gray-900">Luna (Persian Cat)</div>
+                                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">Ready</span>
+                                            </div>
+                                            <div class="text-sm text-gray-600">RFID: C3D4E5F6 • Owner: Anna Reyes</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card">
-                        <h3>🔄 RFID Scanner Status</h3>
-                        <div class="rfid-scanner">
-                            <div class="rfid-status">Scanner Ready</div>
-                            <p>Last scan: A1B2C3D4 - 2 minutes ago</p>
-                            <button class="btn" onclick="simulateRFIDScan()">Simulate RFID Scan</button>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <h3>⚡ Quick Actions</h3>
-                        <div style="display: flex; flex-direction: column; gap: 1rem;">
-                            <button class="btn" onclick="showPage('checkin')">New Check-in</button>
-                            <button class="btn btn-secondary" onclick="showPage('tracking')">Update Pet Status</button>
-                            <button class="btn btn-secondary" onclick="showPage('billing')">Process Payment</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Check-in Page -->
-            <div id="checkin" class="page">
-                <div class="page-header">
-                    <h1>Pet Check-in</h1>
-                    <p>Register a new pet for grooming services</p>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <h3>🏷️ RFID Tag Assignment</h3>
-                        <div class="rfid-scanner">
-                            <div class="rfid-status" id="rfidStatus">Place RFID tag near scanner</div>
-                            <p id="rfidResult">Detected: <span id="detectedTag">None</span></p>
-                        </div>
-                    </div>
-
-                    <div class="card" style="grid-column: span 2;">
-                        <h3>📝 Pet Information</h3>
-                        <form id="checkinForm">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                <div class="form-group">
-                                    <label for="petName">Pet Name</label>
-                                    <input type="text" id="petName" name="petName" required>
+                    <!-- Right Column -->
+                    <div class="space-y-6">
+                        <!-- RFID Scanner Status -->
+                        <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6">
+                            <div class="flex items-center mb-6">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-full mr-4">
+                                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
                                 </div>
-                                <div class="form-group">
-                                    <label for="petBreed">Breed</label>
-                                    <input type="text" id="petBreed" name="petBreed" required>
+                                <div>
+                                    <h3 class="text-xl font-bold text-gray-900">RFID Scanner Status</h3>
+                                    <p class="text-sm text-gray-600">Scanner ready for operations</p>
                                 </div>
                             </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                <div class="form-group">
-                                    <label for="ownerName">Owner Name</label>
-                                    <input type="text" id="ownerName" name="ownerName" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="ownerPhone">Phone Number</label>
-                                    <input type="tel" id="ownerPhone" name="ownerPhone" required>
-                                </div>
+                            <div class="bg-gradient-to-r from-gold-500 to-gold-600 text-white p-6 rounded-xl text-center">
+                                <div class="text-lg font-semibold mb-2">Scanner Ready</div>
+                                <p class="text-gold-100 mb-4">Last scan: A1B2C3D4 - 2 minutes ago</p>
+                                <button class="btn-hover bg-white text-gold-600 px-6 py-3 rounded-xl font-semibold transition-all duration-200" onclick="simulateRFIDScan()">Simulate RFID Scan</button>
                             </div>
-
-                            <div class="form-group">
-                                <label for="services">Services Requested</label>
-                                <select id="services" name="services" multiple style="height: 100px;">
-                                    <option value="basic_bath">Basic Bath (₱300)</option>
-                                    <option value="full_groom">Full Grooming (₱600)</option>
-                                    <option value="nail_trim">Nail Trimming (₱100)</option>
-                                    <option value="ear_clean">Ear Cleaning (₱150)</option>
-                                    <option value="dental_care">Dental Care (₱200)</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="specialInstructions">Special Instructions</label>
-                                <textarea id="specialInstructions" name="specialInstructions" rows="3"></textarea>
-                            </div>
-
-                            <button type="submit" class="btn">Complete Check-in</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Pet Tracking Page -->
-            <div id="tracking" class="page">
-                <div class="page-header">
-                    <h1>Pet Tracking</h1>
-                    <p>Monitor real-time grooming progress</p>
-                </div>
-
-                <div class="workflow-steps">
-                    <div class="workflow-step">
-                        <div class="step-number">1</div>
-                        <h4>Check-in</h4>
-                        <p>RFID tag assigned</p>
-                    </div>
-                    <div class="workflow-step">
-                        <div class="step-number">2</div>
-                        <h4>Bathing</h4>
-                        <p>Pet washing stage</p>
-                    </div>
-                    <div class="workflow-step">
-                        <div class="step-number">3</div>
-                        <h4>Grooming</h4>
-                        <p>Styling & trimming</p>
-                    </div>
-                    <div class="workflow-step">
-                        <div class="step-number">4</div>
-                        <h4>Ready</h4>
-                        <p>Pickup notification</p>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3>🔍 Pet Status Updates</h3>
-                    <div class="pet-list" id="trackingList">
-                        <!-- Pet tracking items will be populated here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Customers Page -->
-            <div id="customers" class="page">
-                <div class="page-header">
-                    <h1>Customer Management</h1>
-                    <p>Manage customer profiles and history</p>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <h3>👥 Customer Database</h3>
-                        <div style="margin-bottom: 1rem;">
-                            <input type="text" placeholder="Search customers..." style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px;">
                         </div>
-                        <div class="pet-list" id="customerList">
-                            <!-- Customer list will be populated here -->
-                        </div>
-                    </div>
 
-                    <div class="card">
-                        <h3>📊 Customer Insights</h3>
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <span class="stat-number">156</span>
-                                <span>Total Customers</span>
+                        <!-- Quick Actions -->
+                        <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6">
+                            <div class="flex items-center mb-6">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full mr-4">
+                                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-gray-900">Quick Actions</h3>
+                                    <p class="text-sm text-gray-600">Common operations</p>
+                                </div>
                             </div>
-                            <div class="stat-card">
-                                <span class="stat-number">23</span>
-                                <span>New This Month</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-number">89%</span>
-                                <span>Retention Rate</span>
+                            <div class="space-y-3">
+                                <button class="btn-hover w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white py-3 rounded-xl font-semibold transition-all duration-200" onclick="showPage('checkin')">New Check-in</button>
+                                <button class="btn-hover w-full border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-xl font-semibold transition-all duration-200" onclick="showPage('tracking')">Update Pet Status</button>
+                                <button class="btn-hover w-full border border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-xl font-semibold transition-all duration-200" onclick="showPage('billing')">Process Payment</button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Billing Page -->
-            <div id="billing" class="page">
-                <div class="page-header">
-                    <h1>Billing & Payments</h1>
-                    <p>Process payments and manage invoices</p>
-                </div>
+        </div>
+    </main>
 
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <h3>💳 Quick Billing</h3>
-                        <div class="form-group">
-                            <label for="billPetSelect">Select Pet</label>
-                            <select id="billPetSelect">
-                                <option value="">Choose pet...</option>
-                                <option value="snowy">Snowy - Ready for pickup</option>
-                                <option value="buddy">Buddy - Grooming complete</option>
-                            </select>
-                        </div>
-                        <div id="billingSummary" style="display: none;">
-                            <h4>Billing Summary</h4>
-                            <div style="margin: 1rem 0; padding: 1rem; background: #f8f9ff; border-radius: 5px;">
-                                <p><strong>Services:</strong></p>
-                                <p>• Full Grooming: ₱600</p>
-                                <p>• Nail Trimming: ₱100</p>
-                                <hr style="margin: 0.5rem 0;">
-                                <p><strong>Total: ₱700</strong></p>
-                            </div>
-                            <button class="btn">Process Payment</button>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <h3>📄 Recent Transactions</h3>
-                        <div class="pet-list">
-                            <div class="pet-item">
-                                <div class="pet-info">
-                                    <h4>Luna - Persian Cat</h4>
-                                    <p>Services: Basic Bath, Ear Cleaning</p>
-                                </div>
-                                <div style="text-align: right;">
-                                    <strong>₱450</strong>
-                                    <br><small>Paid</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Staff Page -->
-            <div id="staff" class="page">
-                <div class="page-header">
-                    <h1>Staff Management</h1>
-                    <p>Manage staff schedules and performance</p>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <h3>👨‍💼 Staff on Duty</h3>
-                        <div class="pet-list">
-                            <div class="pet-item">
-                                <div class="pet-info">
-                                    <h4>Sarah Johnson</h4>
-                                    <p>Senior Groomer • Currently: Grooming Snowy</p>
-                                </div>
-                                <span class="status-indicator status-grooming">Busy</span>
-                            </div>
-                            <div class="pet-item">
-                                <div class="pet-info">
-                                    <h4>Mike Rivera</h4>
-                                    <p>Bath Specialist • Currently: Bathing Buddy</p>
-                                </div>
-                                <span class="status-indicator status-bathing">Busy</span>
-                            </div>
-                            <div class="pet-item">
-                                <div class="pet-info">
-                                    <h4>Lisa Chen</h4>
-                                    <p>Junior Groomer • Status: Available</p>
-                                </div>
-                                <span class="status-indicator status-ready">Available</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <h3>📅 Task Assignment</h3>
-                        <form>
-                            <div class="form-group">
-                                <label for="assignStaff">Assign Staff</label>
-                                <select id="assignStaff">
-                                    <option>Sarah Johnson</option>
-                                    <option>Mike Rivera</option>
-                                    <option>Lisa Chen</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="assignPet">To Pet</label>
-                                <select id="assignPet">
-                                    <option>Snowy (Waiting)</option>
-                                    <option>Max (Bathing)</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn">Assign Task</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Reports Page -->
-            <div id="reports" class="page">
-                <div class="page-header">
-                    <h1>Reports & Analytics</h1>
-                    <p>Business insights and performance metrics</p>
-                </div>
-
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <span class="stat-number">₱45,230</span>
-                        <span>Monthly Revenue</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number">187</span>
-                        <span>Pets Served</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number">4.8</span>
-                        <span>Avg Rating</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-number">95%</span>
-                        <span>RFID Accuracy</span>
-                    </div>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <h3>📈 Performance Metrics</h3>
-                        <p>RFID Read Accuracy: <strong>97.5%</strong> ✅</p>
-                        <p>Avg Update Speed: <strong>3.2 seconds</strong> ✅</p>
-                        <p>Customer Satisfaction: <strong>87%</strong> ✅</p>
-                        <p>Staff System Usage: <strong>92%</strong> ✅</p>
-                    </div>
-
-                    <div class="card">
-                        <h3>🕒 Service Times</h3>
-                        <p>Average Bath Time: <strong>25 minutes</strong></p>
-                        <p>Average Groom Time: <strong>45 minutes</strong></p>
-                        <p>Total Turnaround: <strong>1.2 hours</strong></p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Settings Page -->
-            <div id="settings" class="page">
-                <div class="page-header">
-                    <h1>System Settings</h1>
-                    <p>Configure your RFID grooming system</p>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="card">
-                        <h3>🔧 RFID Configuration</h3>
-                        <div class="form-group">
-                            <label for="rfidMode">Scanner Mode</label>
-                            <select id="rfidMode">
-                                <option>Auto-scan (Recommended)</option>
-                                <option>Manual scan</option>
-                                <option>Continuous scan</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="scanDelay">Scan Delay (seconds)</label>
-                            <input type="number" id="scanDelay" value="2" min="1" max="10">
-                        </div>
-                        <button class="btn">Save RFID Settings</button>
-                    </div>
-
-                    <div class="card">
-                        <h3>💰 Service Pricing</h3>
-                        <div class="form-group">
-                            <label for="basicBath">Basic Bath</label>
-                            <input type="number" id="basicBath" value="300">
-                        </div>
-                        <div class="form-group">
-                            <label for="fullGroom">Full Grooming</label>
-                            <input type="number" id="fullGroom" value="600">
-                        </div>
-                        <div class="form-group">
-                            <label for="nailTrim">Nail Trimming</label>
-                            <input type="number" id="nailTrim" value="100">
-                        </div>
-                        <button class="btn">Update Pricing</button>
-                    </div>
-
-                    <div class="card">
-                        <h3>📱 Notifications</h3>
-                        <div style="margin-bottom: 1rem;">
-                            <input type="checkbox" id="smsNotify" checked>
-                            <label for="smsNotify">SMS notifications to customers</label>
-                        </div>
-                        <div style="margin-bottom: 1rem;">
-                            <input type="checkbox" id="emailNotify" checked>
-                            <label for="emailNotify">Email receipts</label>
-                        </div>
-                        <div style="margin-bottom: 1rem;">
-                            <input type="checkbox" id="staffAlerts">
-                            <label for="staffAlerts">Staff mobile alerts</label>
-                        </div>
-                        <button class="btn">Save Notification Settings</button>
-                    </div>
-                </div>
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="text-center text-sm text-gray-500">
+                <p>&copy; 2025 Animates Pet Boutique & Grooming Salon. Professional Pet Care Services.</p>
+                <p class="mt-2">📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567 | 📧 animates.ph.fairview@gmail.com</p>
             </div>
         </div>
-    </div>
+    </footer>
 
     <script>
+        alert('Dashboard script loaded');
+        console.log('Dashboard script loaded');
+        // alert('Dashboard script loaded - check console for details');
+
         // Sample data
         let petData = [
             {
@@ -831,20 +296,30 @@
         let availableRFIDTags = ['D4E5F6G7', 'E5F6G7H8', 'F6G7H8I9', 'G7H8I9J0'];
         let currentDetectedTag = null;
 
+        // Mobile menu toggle function
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        }
+
         // Navigation function
         function showPage(pageId) {
             // Hide all pages
             const pages = document.querySelectorAll('.page');
             pages.forEach(page => page.classList.remove('active'));
-            
+
             // Show selected page
             document.getElementById(pageId).classList.add('active');
-            
+
             // Update navigation
             const navLinks = document.querySelectorAll('.nav-link');
-            navLinks.forEach(link => link.classList.remove('active'));
-            event.target.classList.add('active');
-            
+            navLinks.forEach(link => {
+                link.classList.remove('text-gold-600', 'font-semibold');
+                link.classList.add('text-gray-700', 'font-medium');
+            });
+            event.target.classList.remove('text-gray-700', 'font-medium');
+            event.target.classList.add('text-gold-600', 'font-semibold');
+
             // Load page-specific content
             loadPageContent(pageId);
         }
@@ -998,15 +473,69 @@
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
+        // Current selected period
+        let currentPeriod = 'today';
+
         // Update dashboard statistics
         function updateDashboard() {
-            const totalPets = petData.length;
-            const inProgress = petData.filter(p => p.status === 'bathing' || p.status === 'grooming').length;
-            const completed = petData.filter(p => p.status === 'ready' || p.status === 'completed').length;
-            
-            document.getElementById('totalPets').textContent = totalPets;
-            document.getElementById('inProgress').textContent = inProgress;
-            document.getElementById('completed').textContent = completed;
+            console.log('updateDashboard called with period:', currentPeriod);
+            const url = 'http://localhost/animates/api/dashboard_stats.php?period=' + currentPeriod + '&t=' + Date.now();
+            console.log('Fetching from URL:', url);
+
+            fetch(url)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    if (data.success) {
+                        console.log('Updating DOM with data:', data.data);
+                        document.getElementById('totalPets').textContent = data.data.total_pets;
+                        document.getElementById('inProgress').textContent = data.data.in_progress;
+                        document.getElementById('completed').textContent = data.data.completed;
+                        document.getElementById('revenue').textContent = '₱' + data.data.revenue.toLocaleString();
+                        console.log('DOM updated successfully');
+                    } else {
+                        console.error('Failed to fetch dashboard stats:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching dashboard stats:', error);
+                });
+        }
+
+        // Handle filter button clicks
+        function setupFilterButtons() {
+            console.log('Setting up filter buttons');
+            var buttons = ['today', 'week', 'month', 'year'];
+            for (var i = 0; i < buttons.length; i++) {
+                var period = buttons[i];
+                console.log('Setting up button for period:', period);
+                var button = document.getElementById('filter-' + period);
+                if (button) {
+                    console.log('Button found for period:', period);
+                    button.onclick = (function(p) {
+                        return function() {
+                            console.log('Button clicked for period:', p);
+                            // Update active button styling
+                            var allButtons = document.querySelectorAll('[id^="filter-"]');
+                            for (var j = 0; j < allButtons.length; j++) {
+                                allButtons[j].classList.remove('active-filter', 'bg-gold-500', 'text-white', 'hover:bg-gold-600');
+                                allButtons[j].classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                            }
+                            this.classList.add('active-filter', 'bg-gold-500', 'text-white', 'hover:bg-gold-600');
+                            this.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+
+                            // Update period and refresh data
+                            currentPeriod = p;
+                            updateDashboard();
+                        };
+                    })(period);
+                } else {
+                    console.log('Button NOT found for period:', period);
+                }
+            }
         }
 
         // Check-in form handling
@@ -1070,4 +599,5 @@
         document.head.appendChild(style);
 
         // Initialize dashboard
+        setupFilterButtons();
         updateDashboard();

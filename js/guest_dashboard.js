@@ -362,7 +362,7 @@ function celebrateCompletion() {
         <div class="bg-white rounded-2xl p-8 max-w-md mx-4 text-center transform scale-95 celebration-popup">
             <div class="text-6xl mb-4 animate-bounce">🎉</div>
             <h2 class="text-2xl font-bold text-emerald-600 mb-2">Service Completed!</h2>
-            <p class="text-gray-600 mb-4">Thank you for choosing 8Paws Pet Boutique!</p>
+            <p class="text-gray-600 mb-4">Thank you for choosing Animates Pet Boutique!</p>
             <div class="text-4xl mb-4">✨🐾✨</div>
             <button onclick="closeCelebration()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium transition-colors">
                 Wonderful! 🎊

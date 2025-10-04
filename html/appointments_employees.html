@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PetCare Pro - Appointments Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#D4AF37',
+                        secondary: '#8C7A1E',
+                        gold: {
+                            50: '#FFFBEB',
+                            100: '#FEF3C7',
+                            200: '#FDE68A',
+                            300: '#FCD34D',
+                            400: '#FBBF24',
+                            500: '#D4AF37',
+                            600: '#D97706',
+                            700: '#B45309',
+                            800: '#92400E',
+                            900: '#78350F'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+        .gradient-bg { background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
+        .card-shadow { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        .btn-hover { transition: all 0.3s ease; }
+        .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(212, 175, 55, 0.4); }
+        .status-waiting { background: #fff3cd; color: #856404; }
+        .status-bathing { background: #cce5ff; color: #0066cc; }
+        .status-grooming { background: #ffe6cc; color: #cc6600; }
+        .status-ready { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex flex-col">
+    <!-- Decorative background elements -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-gold-200/30 to-gold-300/20 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-gold-100/30 to-gold-200/20 rounded-full blur-3xl"></div>
+    </div>
+
+    <header class="relative bg-white/80 backdrop-blur-sm shadow-sm border-b border-gold-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-gold-200 rounded-full blur-sm"></div>
+                        <img src="../animates_logo.png" alt="Animates Logo" class="relative h-14 w-14 object-contain">
+                    </div>
+                    <div>
+                        <p class="text-lg font-semibold text-gold-700">Animates PH</p>
+                        <p class="text-sm text-gold-600 font-medium">Camaro Branch</p>
+                        <p class="text-xs text-gray-500">Appointments</p>
+                    </div>
+                </div>
+                <!-- Navigation -->
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="dashboard_employees.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Dashboard</a>
+                    <a href="appointments_employees.html" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">Appointments</a>
+                    <a href="admin_accounts.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">User Management</a>
+                    <a href="billing_management.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Billing</a>
+                    <a href="reports.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Reports</a>
+
+                    <div class="border-l border-gray-300 pl-6 ml-2">
+                        <button onclick="logout()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </nav>
+
+                <!-- Mobile menu button -->
+                <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Mobile Navigation -->
+            <div id="mobileMenu" class="md:hidden hidden pb-4">
+                <div class="flex flex-col space-y-2">
+                    <a href="dashboard_employees.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Dashboard</a>
+                    <a href="appointments_employees.html" class="mobile-nav-link text-gold-600 font-semibold py-2 transition-colors duration-200">Appointments</a>
+                    <a href="admin_accounts.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">User Management</a>
+                    <a href="billing_management.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Billing</a>
+                    <a href="reports.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Reports</a>
+
+                    <div class="border-t border-gray-300 pt-3 mt-3">
+                        <button onclick="logout()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600 py-2 w-full text-left">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative flex-grow px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-7xl mx-auto">
+            <!-- Page Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Appointments Management</h1>
+                <p class="text-gray-600">Manage and track all pet grooming appointments</p>
+            </div>
+
+            <!-- Appointments Section -->
+            <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        All Appointments
+                    </h2>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div class="flex space-x-2">
+                        <button onclick="filterAppointments('all')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">All</button>
+                        <button onclick="filterAppointments('scheduled')" class="px-4 py-2 bg-gold-500 text-white rounded-lg text-sm font-medium">Scheduled</button>
+                        <button onclick="filterAppointments('confirmed')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Confirmed</button>
+                        <button onclick="filterAppointments('completed')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Completed</button>
+                        <button onclick="filterAppointments('cancelled')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">Cancelled</button>
+                    </div>
+
+                    <div class="flex space-x-2 items-center">
+                        <label class="text-sm font-medium text-gray-700">Filter by:</label>
+                        <select id="monthFilter" onchange="applyFilters()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gold-500 focus:border-transparent">
+                            <option value="">All Months</option>
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                        <select id="yearFilter" onchange="applyFilters()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gold-500 focus:border-transparent">
+                            <option value="">All Years</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="appointmentsContainer">
+                    <div class="text-center py-12">
+                        <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-gray-500 text-lg">Loading appointments...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="text-center text-sm text-gray-500">
+                <p>&copy; 2025 Animates Pet Boutique & Grooming Salon. Professional Pet Care Services.</p>
+                <p class="mt-2">📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567 | 📧 animates.ph.fairview@gmail.com</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Logout Confirmation Modal -->
+    <div id="logoutModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10001] hidden">
+        <div class="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-white/20 transform animate-in fade-in-0 zoom-in-95 duration-300">
+            <div class="text-center">
+                <!-- Icon container with enhanced styling -->
+                <div class="w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+                    </svg>
+                </div>
+
+                <!-- Title with better typography -->
+                <h3 class="text-xl font-bold text-gray-900 mb-3">Confirm Logout</h3>
+
+                <!-- Message with improved spacing -->
+                <p class="text-gray-600 mb-8 leading-relaxed">Are you sure you want to log out? You will need to sign in again to access this page.</p>
+
+                <!-- Enhanced button styling -->
+                <div class="flex gap-3">
+                    <button onclick="closeLogoutModal()" class="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button onclick="confirmLogout()" class="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API base URL
+        const API_BASE = 'http://localhost/animates/api/';
+
+        let appointmentsData = [];
+
+        // Mobile menu toggle function
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Logout modal elements
+        const logoutModal = document.getElementById('logoutModal');
+
+        // Logout function
+        function logout() {
+            logoutModal.classList.remove('hidden');
+        }
+
+        // Close logout modal
+        function closeLogoutModal() {
+            logoutModal.classList.add('hidden');
+        }
+
+        // Confirm logout
+        function confirmLogout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_role');
+            localStorage.removeItem('auth_email');
+            localStorage.removeItem('auth_staff_role');
+            localStorage.removeItem('auth_user_id');
+
+            // Prevent back navigation by replacing current history entry
+            history.replaceState(null, null, 'admin_staff_auth.html');
+
+            // Redirect to login page
+            window.location.href = 'admin_staff_auth.html';
+        }
+
+        // Make logout functions globally accessible
+        window.logout = logout;
+        window.closeLogoutModal = closeLogoutModal;
+        window.confirmLogout = confirmLogout;
+
+        // Load appointments from API
+        async function loadAppointments(status = 'scheduled', month = null, year = null) {
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    showNotification('Authentication required. Please log in again.', 'error');
+                    return;
+                }
+
+                let url = `${API_BASE}appointments.php?action=get_all_appointments`;
+
+                const params = [];
+                if (status && status !== 'all') {
+                    params.push(`status=${status}`);
+                }
+                if (month) {
+                    params.push(`month=${month}`);
+                }
+                if (year) {
+                    params.push(`year=${year}`);
+                }
+
+                if (params.length > 0) {
+                    url += '&' + params.join('&');
+                }
+
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    appointmentsData = result.appointments;
+
+                    // Sort scheduled appointments by date ascending (nearest first)
+                    if (status === 'scheduled') {
+                        appointmentsData.sort((a, b) => {
+                            const dateA = new Date(a.appointment_date + ' ' + a.appointment_time);
+                            const dateB = new Date(b.appointment_date + ' ' + b.appointment_time);
+                            return dateA - dateB;
+                        });
+                    }
+
+                    displayAppointments(appointmentsData);
+                } else {
+                    showNotification('Error loading appointments: ' + (result.error || 'Unknown error'), 'error');
+                    displayAppointments([]);
+                }
+            } catch (error) {
+                console.error('Error loading appointments:', error);
+                showNotification('Error connecting to server. Please try again.', 'error');
+                displayAppointments([]);
+            }
+        }
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+
+            notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300`;
+            notification.textContent = message;
+
+            document.body.appendChild(notification);
+
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+
+            // Remove after 4 seconds
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 4000);
+        }
+
+        // Initialize year dropdown with dynamic years
+        function initializeYearDropdown() {
+            const yearSelect = document.getElementById('yearFilter');
+            if (!yearSelect) return;
+
+            const currentYear = new Date().getFullYear();
+
+            // Generate years from current year - 2 to current year + 2
+            for (let year = currentYear + 2; year >= currentYear - 2; year--) {
+                const option = document.createElement('option');
+                option.value = year.toString();
+                option.textContent = year.toString();
+                yearSelect.appendChild(option);
+            }
+        }
+
+        // Load appointments on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize year dropdown
+            initializeYearDropdown();
+
+            // Set current year as default
+            const currentYearValue = new Date().getFullYear().toString();
+            const yearSelect = document.getElementById('yearFilter');
+            if (yearSelect) {
+                yearSelect.value = currentYearValue;
+                currentYear = currentYearValue;
+            }
+
+            // Load initial appointments
+            applyFilters();
+        });
+
+        // Display appointments
+        function displayAppointments(appointments) {
+            const container = document.getElementById('appointmentsContainer');
+
+            if (!appointments || appointments.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-gray-500 text-lg">No appointments found</p>
+                        <p class="text-gray-400 text-sm mt-2">All appointments will appear here</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    ${appointments.map(appointment => {
+                        // Get status styling based on appointment status
+                        const statusStyle = getStatusStyle(appointment.status);
+
+                        return `
+                        <div class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">🐾</div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900 text-lg">${appointment.pet_name || 'Unknown Pet'} • ${appointment.owner_name || 'Unknown'}</h3>
+                                        <p class="text-sm text-gray-600">${appointment.pet_type || 'Unknown'} • ${appointment.pet_breed || 'Unknown'}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-sm text-gray-500 mb-1">${formatAppointmentDate(appointment.appointment_date || '')}</div>
+                                    <div class="text-sm font-medium text-gray-700">${formatAppointmentTime(appointment.appointment_time || '')}</div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div class="bg-gray-50 rounded p-3">
+                                    <div class="text-xs text-gray-500 uppercase tracking-wide">Status</div>
+                                    <div class="text-sm font-medium ${statusStyle.textColor} capitalize flex items-center">
+                                        <span class="w-2 h-2 ${statusStyle.dotColor} rounded-full mr-2"></span>
+                                        ${appointment.status === 'confirmed' ? 'scheduled' : (appointment.status || 'unknown')}
+                                    </div>
+                                    ${appointment.status === 'cancelled' && appointment.cancelled_by_name ? `
+                                        <div class="text-xs text-gray-600 mt-1">
+                                            Cancelled by ${appointment.cancelled_by_name}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <div class="bg-primary/10 rounded p-3">
+                                    <div class="text-xs text-primary uppercase tracking-wide">Total Amount</div>
+                                    <div class="text-lg font-bold text-primary">₱${parseFloat(appointment.total_amount || 0).toFixed(2)}</div>
+                                </div>
+                            </div>
+
+                            ${appointment.status === 'cancelled' && appointment.cancellation_remarks ? `
+                                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                                    <div class="text-xs text-red-600 uppercase tracking-wide font-medium mb-2">Cancellation Reason</div>
+                                    <div class="text-sm text-red-800">${appointment.cancellation_remarks}</div>
+                                </div>
+                            ` : ''}
+
+                            <div class="flex items-center justify-between">
+                                <div class="text-sm text-gray-600">
+                                    <span class="font-medium">Services:</span>
+                                    <span>${appointment.services ? appointment.services.map(s => s.name).join(', ') : 'None'}</span>
+                                </div>
+                                <div class="flex space-x-2">
+                                    ${appointment.status === 'scheduled' ? `
+                                        <button onclick="viewAppointmentDetails('${appointment.id}')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200">
+                                            View Details
+                                        </button>
+                                        <button onclick="cancelAppointment('${appointment.id}')" class="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200">
+                                            Cancel
+                                        </button>
+                                        ${canAdmitAppointment(appointment.appointment_date) ? `
+                                            <button onclick="admitAppointment('${appointment.id}')" class="px-3 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200">
+                                                Admit
+                                            </button>
+                                        ` : `
+                                            <button disabled class="px-3 py-1 bg-gray-100 text-gray-400 rounded text-sm cursor-not-allowed" title="Available on appointment date">
+                                                Admit
+                                            </button>
+                                        `}
+                                    ` : `
+                                        <button onclick="viewAppointmentDetails('${appointment.id}')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200">
+                                            View Details
+                                        </button>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function formatAppointmentDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function formatAppointmentTime(timeString) {
+            // Convert 24-hour time to 12-hour format
+            const [hours, minutes] = timeString.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const hour12 = hour % 12 || 12;
+            return `${hour12}:${minutes} ${ampm}`;
+        }
+
+        // Get status styling based on appointment status
+        function getStatusStyle(status) {
+            // Map "confirmed" to "scheduled" for display
+            const displayStatus = status === 'confirmed' ? 'scheduled' : status;
+
+            const statusStyles = {
+                'scheduled': {
+                    textColor: 'text-blue-600',
+                    dotColor: 'bg-blue-500'
+                },
+                'completed': {
+                    textColor: 'text-green-600',
+                    dotColor: 'bg-green-500'
+                },
+                'cancelled': {
+                    textColor: 'text-red-600',
+                    dotColor: 'bg-red-500'
+                }
+            };
+
+            return statusStyles[displayStatus] || {
+                textColor: 'text-gray-600',
+                dotColor: 'bg-gray-400'
+            };
+        }
+
+        // Global variables to track current filter state
+        let currentStatus = 'scheduled';
+        let currentMonth = null;
+        let currentYear = null;
+
+        // Filter appointments by status
+        async function filterAppointments(status) {
+            // Update button styles
+            const buttons = document.querySelectorAll('.flex.space-x-2 button');
+            buttons.forEach(btn => {
+                btn.classList.remove('bg-gold-500', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+
+            // Highlight active button
+            event.target.classList.remove('bg-gray-200', 'text-gray-700');
+            event.target.classList.add('bg-gold-500', 'text-white');
+
+            currentStatus = status;
+            await applyFilters();
+        }
+
+        // Apply combined filters (status + month + year)
+        async function applyFilters() {
+            const monthSelect = document.getElementById('monthFilter');
+            const yearSelect = document.getElementById('yearFilter');
+
+            currentMonth = monthSelect.value || null;
+            currentYear = yearSelect.value || null;
+
+            await loadAppointments(currentStatus, currentMonth, currentYear);
+        }
+
+        // Check if appointment can be admitted (on or after appointment date)
+        function canAdmitAppointment(appointmentDate) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Set to start of today
+
+            const appointmentDateObj = new Date(appointmentDate);
+            appointmentDateObj.setHours(0, 0, 0, 0); // Set to start of appointment date
+
+            // Can admit if appointment date is today or in the past
+            return appointmentDateObj <= today;
+        }
+
+        // View appointment details
+        async function viewAppointmentDetails(appointmentId) {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}appointments.php?action=get_appointment_details&appointment_id=${appointmentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.appointment) {
+                    showAppointmentDetailsModal(result.appointment);
+                } else {
+                    showNotification('Error loading appointment details', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading appointment details:', error);
+                showNotification('Error loading appointment details', 'error');
+            }
+        }
+
+        // Show appointment details modal
+        function showAppointmentDetailsModal(appointment) {
+            // Initialize variables for package processing
+            let processedServices = new Set();
+            let processedPackages = new Set();
+
+            // Create modal HTML for viewing appointment details
+            const modalHtml = `
+                <div id="appointmentDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+                    <div class="bg-white rounded-2xl p-8 max-w-5xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <!-- Header -->
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="flex items-center space-x-4 mb-1">
+                                        <h2 class="text-2xl font-bold text-gray-900">Appointment Details</h2>
+                                        <div class="inline-flex items-center px-3 py-2 rounded-full ${getStatusBadgeClass(appointment.status)}">
+                                            <div class="w-2 h-2 rounded-full mr-2 ${getStatusColorCircle(appointment.status)}"></div>
+                                            <span class="text-sm font-medium capitalize">${appointment.status}</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-sm text-gray-600">Booking ID: ${appointment.id}</p>
+                                </div>
+                            </div>
+                            <button onclick="closeModal('appointmentDetailsModal')" class="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Main Content - Single Column Layout -->
+                        <div class="space-y-8 mb-8">
+                            <!-- Pet Information -->
+                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+                                <h3 class="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                                    </svg>
+                                    Pet Information
+                                </h3>
+                                <div class="space-y-4">
+                                    <!-- Row 1: Pet Name and Pet Type -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Pet Name</label>
+                                            <p class="text-gray-900 font-medium">${appointment.pet_name}</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Pet Type</label>
+                                            <p class="text-gray-900 font-medium capitalize">${appointment.pet_type}</p>
+                                        </div>
+                                    </div>
+                                    <!-- Row 2: Breed and Pet Size -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Breed</label>
+                                            <p class="text-gray-900 font-medium">${appointment.pet_breed}</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Pet Size</label>
+                                            <p class="text-gray-900 font-medium">${appointment.pet_size || 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Appointment Details -->
+                            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                                <h3 class="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Appointment Details
+                                </h3>
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                            <p class="text-gray-900 font-medium">${formatAppointmentDate(appointment.appointment_date)}</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                                            <p class="text-gray-900 font-medium">${formatAppointmentTime(appointment.appointment_time)}</p>
+                                        </div>
+                                    </div>
+                                    ${appointment.special_instructions ? `
+                                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Special Instructions</label>
+                                            <p class="text-gray-900">${appointment.special_instructions}</p>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+
+                            <!-- Vaccination Information -->
+                            <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6">
+                                <h3 class="text-lg font-semibold text-amber-900 mb-4 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Vaccination Information
+                                </h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <!-- Vaccine Date -->
+                                    <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                        ${appointment.last_vaccine_date ? `
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Vaccine Update Date</label>
+                                            <p class="text-gray-900 font-medium">${new Date(appointment.last_vaccine_date).toLocaleDateString()}</p>
+                                        ` : `
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Vaccine Update Date</label>
+                                            <p class="text-gray-500 text-sm">Not provided</p>
+                                        `}
+                                    </div>
+
+                                    <!-- Vaccine Type -->
+                                    <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                        ${appointment.vaccine_types ? `
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Type of Vaccine</label>
+                                            <p class="text-gray-900 font-medium capitalize">${(() => {
+                                                try {
+                                                    // Handle JSON array format like ["parvo"] or string format
+                                                    const vaccineData = typeof appointment.vaccine_types === 'string' ?
+                                                        JSON.parse(appointment.vaccine_types) : appointment.vaccine_types;
+                                                    return Array.isArray(vaccineData) ? vaccineData.join(', ') : vaccineData;
+                                                } catch (e) {
+                                                    return appointment.vaccine_types;
+                                                }
+                                            })()}</p>
+                                        ` : `
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Type of Vaccine</label>
+                                            <p class="text-gray-500 text-sm">Not provided</p>
+                                        `}
+                                    </div>
+
+                                    <!-- Vaccination Proof Link -->
+                                    <div class="bg-white p-4 rounded-lg border border-gray-200">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Vaccination Proof</label>
+                                        ${appointment.vaccination_proof ? `
+                                            <button onclick="showVaccinationProofModal('../${appointment.vaccination_proof}')"
+                                                    class="text-blue-600 hover:text-blue-800 underline font-medium transition-colors">
+                                                View Proof
+                                            </button>
+                                        ` : `
+                                            <p class="text-gray-500 text-sm">Not uploaded</p>
+                                        `}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Services -->
+                            <div class="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
+                                <h3 class="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                    Services (${appointment.services ? appointment.services.length : 0})
+                                </h3>
+                                <div class="space-y-3 max-h-80 overflow-y-auto" id="appointmentServicesList">
+                                    <!-- Services will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Order Summary -->
+                        <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6 mb-8">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-xl font-semibold text-orange-900 flex items-center gap-2">
+                                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                    Order Summary
+                                </h3>
+                                <div class="text-right">
+                                    <p class="text-sm text-gray-600">Total Amount</p>
+                                    <p class="text-3xl font-bold text-primary">₱${parseFloat(appointment.total_amount).toFixed(2)}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                            <button onclick="closeModal('appointmentDetailsModal')"
+                                    class="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors duration-200">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            // Populate services list
+            populateAppointmentServices(appointment);
+        }
+
+        // Helper functions for modal
+        function getStatusBadgeClass(status) {
+            const badgeClasses = {
+                'scheduled': 'bg-blue-100 text-blue-800 border border-blue-200',
+                'confirmed': 'bg-green-100 text-green-800 border border-green-200',
+                'cancelled': 'bg-red-100 text-red-800 border border-red-200',
+                'completed': 'bg-gray-100 text-gray-800 border border-gray-200'
+            };
+
+            return badgeClasses[status] || 'bg-gray-100 text-gray-800 border border-gray-200';
+        }
+
+        function getStatusColorCircle(status) {
+            const statusColors = {
+                'scheduled': 'bg-blue-500',
+                'confirmed': 'bg-green-500',
+                'cancelled': 'bg-red-500',
+                'completed': 'bg-gray-500'
+            };
+
+            return statusColors[status] || 'bg-gray-400';
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Populate appointment services
+        function populateAppointmentServices(appointment) {
+            const container = document.getElementById('appointmentServicesList');
+
+            if (!container) return;
+
+            if (!appointment.services || appointment.services.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">No services selected</p>';
+                return;
+            }
+
+            let html = '';
+
+            // Display services
+            appointment.services.forEach(service => {
+                html += `
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <span class="font-medium text-gray-900">${service.name}</span>
+                                ${service.category ? `<p class="text-sm text-gray-600 mt-1">${service.category}</p>` : ''}
+                            </div>
+                            <span class="text-lg font-bold text-primary ml-4">₱${parseFloat(service.price || 0).toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html || '<p class="text-gray-500 text-center py-4">No services selected</p>';
+        }
+
+        // Show vaccination proof modal
+        function showVaccinationProofModal(imageSrc) {
+            const modalHtml = `
+                <div id="vaccinationProofModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onclick="closeVaccinationProofModal()">
+                    <div class="relative max-w-4xl max-h-screen p-4">
+                        <!-- Close button -->
+                        <button onclick="closeVaccinationProofModal()" class="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+
+                        <!-- Image container -->
+                        <div class="relative" onclick="event.stopPropagation()">
+                            <img src="${imageSrc}" alt="Vaccination Proof" class="max-w-full max-h-screen object-contain rounded-lg shadow-2xl">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            // Prevent body scroll when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeVaccinationProofModal() {
+            const modal = document.getElementById('vaccinationProofModal');
+            if (modal) {
+                modal.remove();
+                // Restore body scroll
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Cancel appointment modal
+        function showCancelAppointmentModal(appointmentId) {
+            const modalHtml = `
+                <div id="cancelAppointmentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+                    <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+                        <div class="text-center">
+                            <!-- Warning Icon -->
+                            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                                <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                            </div>
+
+                            <!-- Title -->
+                            <h2 class="text-xl font-bold text-gray-900 mb-3">Cancel Appointment</h2>
+
+                            <!-- Warning Message -->
+                            <p class="text-gray-600 mb-6">
+                                Are you sure you want to cancel this appointment? This action cannot be undone.
+                            </p>
+
+                            <!-- Cancellation Remarks (Required for staff) -->
+                            <div class="mb-6">
+                                <label for="cancellationRemarks" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Cancellation Reason <span class="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    id="cancellationRemarks"
+                                    rows="4"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                                    placeholder="Please provide a reason for cancelling this appointment..."
+                                    required
+                                ></textarea>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    This information will be visible to the customer and helps maintain transparency.
+                                </p>
+                            </div>
+
+                            <p class="text-sm text-gray-500 mb-8">
+                                If you need to reschedule, please book a new appointment after cancelling this one.
+                            </p>
+
+                            <!-- Action Buttons -->
+                            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                                <button onclick="closeModal('cancelAppointmentModal')"
+                                        class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200">
+                                    Keep Appointment
+                                </button>
+                                <button onclick="confirmCancelAppointment('${appointmentId}')"
+                                        class="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors duration-200">
+                                    Cancel Appointment
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        // Admit appointment modal
+        function showAdmitAppointmentModal(appointmentId) {
+            const modalHtml = `
+                <div id="admitAppointmentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+                    <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+                        <div class="text-center">
+                            <!-- Check Icon -->
+                            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                                <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+
+                            <!-- Title -->
+                            <h2 class="text-xl font-bold text-gray-900 mb-3">Admit Appointment</h2>
+
+                            <!-- Confirmation Message -->
+                            <p class="text-gray-600 mb-8">
+                                Are you sure you want to admit this appointment? The pet has arrived and is ready for service.
+                            </p>
+
+                            <p class="text-sm text-gray-500 mb-8">
+                                This will change the appointment status to "confirmed" and indicate the pet is checked in.
+                            </p>
+
+                            <!-- Action Buttons -->
+                            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                                <button onclick="closeModal('admitAppointmentModal')"
+                                        class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200">
+                                    Cancel
+                                </button>
+                                <button onclick="confirmAdmitAppointment('${appointmentId}')"
+                                        class="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors duration-200">
+                                    Admit Appointment
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        // Cancel appointment
+        async function cancelAppointment(appointmentId) {
+            showCancelAppointmentModal(appointmentId);
+        }
+
+        // Admit appointment
+        async function admitAppointment(appointmentId) {
+            showAdmitAppointmentModal(appointmentId);
+        }
+
+        // Confirm cancel appointment
+        async function confirmCancelAppointment(appointmentId) {
+            try {
+                // Get the cancellation remarks from the textarea
+                const remarksTextarea = document.getElementById('cancellationRemarks');
+                const cancellationRemarks = remarksTextarea ? remarksTextarea.value.trim() : '';
+
+                // Validate that remarks are provided
+                if (!cancellationRemarks) {
+                    showNotification('Please provide a reason for cancelling this appointment.', 'error');
+                    return;
+                }
+
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}appointments.php`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        action: 'cancel_appointment',
+                        appointment_id: appointmentId,
+                        cancellation_remarks: cancellationRemarks
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification('Appointment cancelled successfully', 'success');
+                    // Reload appointments
+                    applyFilters();
+                    closeModal('cancelAppointmentModal');
+                } else {
+                    showNotification('Error cancelling appointment: ' + (result.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error cancelling appointment:', error);
+                showNotification('Error connecting to server. Please try again.', 'error');
+            }
+        }
+
+        // Confirm admit appointment
+        async function confirmAdmitAppointment(appointmentId) {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_BASE}appointments.php`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        action: 'admit_appointment',
+                        appointment_id: appointmentId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification('Appointment admitted successfully', 'success');
+                    // Reload appointments
+                    applyFilters();
+                    closeModal('admitAppointmentModal');
+                } else {
+                    showNotification('Error admitting appointment: ' + (result.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error admitting appointment:', error);
+                showNotification('Error connecting to server. Please try again.', 'error');
+            }
+        }
+
+        // Close modal function
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.remove();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -437,7 +437,7 @@
                     localStorage.setItem('authToken', result.token);
                     localStorage.setItem('userId', result.user_id);
 
-                    showNotification('Email verified successfully! Welcome to 8Paws!', 'success');
+                    showNotification('Email verified successfully! Welcome to Animates!', 'success');
                     showSuccessModal();
                 } else {
                     showNotification(result.error || 'Verification failed', 'error');

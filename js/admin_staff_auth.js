@@ -1,40 +1,9 @@
-const tabAdmin = document.getElementById('tab-admin');
-const tabStaff = document.getElementById('tab-staff');
-const expectedRoleInput = document.getElementById('expectedRole');
 const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const form = document.getElementById('signinForm');
 const errorEl = document.getElementById('error');
 const togglePasswordBtn = document.getElementById('togglePassword');
-
-function setRole(role) {
-  expectedRoleInput.value = role;
-  
-  if (role === 'admin') {
-    tabAdmin.classList.remove('tab-inactive');
-    tabAdmin.classList.add('tab-active');
-    tabStaff.classList.remove('tab-active');
-    tabStaff.classList.add('tab-inactive');
-    emailInput.placeholder = 'admin@animates.ph';
-    const badge = document.getElementById('roleBadge');
-    if (badge) badge.textContent = 'Admin Only';
-  } else {
-    tabStaff.classList.remove('tab-inactive');
-    tabStaff.classList.add('tab-active');
-    tabAdmin.classList.remove('tab-active');
-    tabAdmin.classList.add('tab-inactive');
-    emailInput.placeholder = 'staff@animates.ph or cashier@animates.ph';
-    const badge = document.getElementById('roleBadge');
-    if (badge) badge.textContent = 'Staff or Cashier';
-  }
-  errorEl.classList.add('hidden');
-  errorEl.textContent = '';
-  emailInput.focus();
-}
-
-tabAdmin.addEventListener('click', () => setRole('admin'));
-tabStaff.addEventListener('click', () => setRole('staff'));
-setRole('staff');
+const successModal = document.getElementById('success-modal');
 
 togglePasswordBtn.addEventListener('click', () => {
   const isPwd = passwordInput.type === 'password';
@@ -71,67 +40,51 @@ async function signin(email, password) {
 }
 
 form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  errorEl.classList.add('hidden');
-  errorEl.textContent = '';
-  const email = emailInput.value.trim();
-  const password = passwordInput.value;
-  const expectedRole = expectedRoleInput.value;
-  
-  try {
-    const result = await signin(email, password);
-    const actualRole = (result && result.user && result.user.role) ? result.user.role : '';
-    console.log('Signed-in role:', actualRole);
-    
-    if (!actualRole) throw new Error('Unable to determine user role');
-    
-    // Immediate redirect for cashier regardless of selected tab
-    if (actualRole === 'cashier') {
-      if (result.token) {
-        localStorage.setItem('auth_token', result.token);
-        localStorage.setItem('auth_role', actualRole);
-        localStorage.setItem('auth_email', result.user.email);
-        if (result.user_id) localStorage.setItem('auth_user_id', result.user_id);
-      }
-      window.location.href = 'billing_management.html';
-      return;
-    }
+   e.preventDefault();
+   errorEl.classList.add('hidden');
+   errorEl.textContent = '';
+   const email = emailInput.value.trim();
+   const password = passwordInput.value;
 
-    // Allow cashier to login with either admin or staff tab
-    // Only restrict admin tab to admin users
-    if (expectedRole === 'admin' && actualRole !== 'admin') {
-      throw new Error(`Access denied. Admin role required.`);
-    }
-    
-    // Staff tab allows both staff and cashier roles
-    if (expectedRole === 'staff' && !['staff', 'cashier'].includes(actualRole)) {
-      throw new Error(`Access denied. Staff role required.`);
-    }
-    if (result.token) {
-      localStorage.setItem('auth_token', result.token);
-      localStorage.setItem('auth_role', actualRole);
-      localStorage.setItem('auth_email', result.user.email);
-      // Store staff_role if available
-      if (result.user.staff_role) {
-        localStorage.setItem('auth_staff_role', result.user.staff_role);
-      }
-      // Store user ID
-      if (result.user_id) {
-        localStorage.setItem('auth_user_id', result.user_id);
-      }
-    }
-    if (actualRole === 'admin') {
-      window.location.href = 'admin_accounts.html';
-    } else if (['staff'].includes(actualRole)) {
-      // Redirect based on role
-      window.location.href = 'staff_dashboard.html';
-    } else {
-      throw new Error('Unsupported role');
-    }
-  } catch (err) {
-    errorEl.textContent = err.message || 'Sign-in error';
-    errorEl.classList.remove('hidden');
-  }
+   try {
+     const result = await signin(email, password);
+     const actualRole = (result && result.user && result.user.role) ? result.user.role : '';
+     console.log('Signed-in role:', actualRole);
+
+     if (!actualRole) throw new Error('Unable to determine user role');
+
+     // Check if role is allowed for employee login
+     if (!['admin', 'staff', 'manager', 'cashier'].includes(actualRole)) {
+       throw new Error('Access denied. Employee role required.');
+     }
+
+     if (result.token) {
+       localStorage.setItem('auth_token', result.token);
+       localStorage.setItem('auth_role', actualRole);
+       localStorage.setItem('auth_email', result.user.email);
+       // Store staff_role if available
+       if (result.user.staff_role) {
+         localStorage.setItem('auth_staff_role', result.user.staff_role);
+       }
+       // Store user ID
+       if (result.user_id) {
+         localStorage.setItem('auth_user_id', result.user_id);
+       }
+     }
+
+     // Show success modal
+     successModal.classList.remove('hidden');
+
+     // Redirect all employee roles to the employee dashboard
+     let redirectUrl = 'dashboard_employees.html';
+
+     setTimeout(() => {
+       window.location.href = redirectUrl;
+     }, 2000);
+   } catch (err) {
+     errorEl.textContent = err.message || 'Sign-in error';
+     errorEl.classList.remove('hidden');
+   }
 });
 
 

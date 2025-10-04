@@ -11,7 +11,7 @@ use PHPMailer\PHPMailer\Exception;
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-echo "<h1>8Paws Email Configuration Test</h1>";
+echo "<h1>Animates Email Configuration Test</h1>";
 
 // Test 1: Check if required files exist
 echo "<h2>1. File Existence Check</h2>";

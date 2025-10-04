@@ -122,6 +122,9 @@ if ($method === 'GET') {
         case 'get_appointment_details':
             handleGetAppointmentDetails();
             break;
+        case 'get_all_appointments':
+            handleGetAllAppointments();
+            break;
         default:
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Invalid action']);
@@ -148,6 +151,12 @@ if ($method === 'GET') {
             break;
         case 'update_appointment':
             handleUpdateAppointment($input);
+            break;
+        case 'admit_appointment':
+            handleAdmitAppointment($input);
+            break;
+        case 'auto_cancel_overdue':
+            handleAutoCancelOverdueAppointments();
             break;
         default:
             http_response_code(400);
@@ -206,6 +215,7 @@ function handleGetUserAppointments() {
 
         $query = "SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
                   a.total_amount, a.status, a.special_instructions, a.package_customizations,
+                  a.cancelled_by, a.cancelled_by_name, a.cancellation_remarks,
                   p.name as pet_name, p.type as pet_type, p.breed as pet_breed, p.size as pet_size,
                   p.last_vaccine_date, p.vaccine_types, p.custom_vaccine, p.vaccination_proof
                   FROM appointments a
@@ -436,33 +446,76 @@ function handleBookAppointment($input) {
 }
 function handleCancelAppointment($input) {
     $decoded = requireAuth();
-    
+
     try {
         if (!isset($input['appointment_id']) || empty($input['appointment_id'])) {
             throw new Exception('Appointment ID is required');
         }
-        
+
         $appointmentId = intval($input['appointment_id']);
         $db = getDB();
-        
-        // Verify the appointment belongs to the user
-        $stmt = $db->prepare("SELECT id FROM appointments WHERE id = ? AND user_id = ?");
-        $stmt->execute([$appointmentId, $decoded->user_id]);
+
+        // Get user role from database
+        $stmt = $db->prepare("SELECT role, full_name FROM users WHERE id = ? AND is_active = 1");
+        $stmt->execute([$decoded->user_id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            throw new Exception('User not found or inactive');
+        }
+
+        // Split full_name into first and last name for compatibility
+        $nameParts = explode(' ', $user['full_name'], 2);
+        $user['first_name'] = $nameParts[0] ?? '';
+        $user['last_name'] = $nameParts[1] ?? '';
+
+        // Check if user is staff/admin (can cancel any appointment) or customer (can only cancel their own)
+        $isStaff = in_array($user['role'], ['admin', 'manager', 'staff', 'cashier']);
+
+        if ($isStaff) {
+            // Staff can cancel any appointment
+            $stmt = $db->prepare("SELECT id FROM appointments WHERE id = ?");
+            $stmt->execute([$appointmentId]);
+        } else {
+            // Customers can only cancel their own appointments
+            $stmt = $db->prepare("SELECT id FROM appointments WHERE id = ? AND user_id = ?");
+            $stmt->execute([$appointmentId, $decoded->user_id]);
+        }
+
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$appointment) {
             throw new Exception('Appointment not found or you do not have permission to cancel it');
         }
-        
-        // Update appointment status to cancelled
-        $stmt = $db->prepare("UPDATE appointments SET status = 'cancelled' WHERE id = ?");
-        $stmt->execute([$appointmentId]);
-        
+
+        // For staff cancellations, remarks are required
+        if ($isStaff) {
+            if (!isset($input['cancellation_remarks']) || empty(trim($input['cancellation_remarks']))) {
+                throw new Exception('Cancellation remarks are required for staff cancellations');
+            }
+        }
+
+        // Prepare cancellation data
+        $cancelledBy = $decoded->user_id;
+        $cancelledByName = trim($user['first_name'] . ' ' . $user['last_name']);
+        $cancellationRemarks = isset($input['cancellation_remarks']) ? trim($input['cancellation_remarks']) : null;
+
+        // Update appointment status to cancelled with tracking information
+        $stmt = $db->prepare("
+            UPDATE appointments
+            SET status = 'cancelled',
+                cancelled_by = ?,
+                cancelled_by_name = ?,
+                cancellation_remarks = ?
+            WHERE id = ?
+        ");
+        $stmt->execute([$cancelledBy, $cancelledByName, $cancellationRemarks, $appointmentId]);
+
         echo json_encode([
             'success' => true,
             'message' => 'Appointment cancelled successfully'
         ]);
-        
+
     } catch(Exception $e) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -575,16 +628,35 @@ function handleGetAppointmentDetails() {
         $appointmentId = intval($_GET['appointment_id']);
         $db = getDB();
 
-        // Get appointment details
-        $stmt = $db->prepare("SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
-                              a.total_amount, a.status, a.special_instructions, a.package_customizations,
-                              p.id as pet_id, p.name as pet_name, p.type as pet_type, p.breed as pet_breed,
-                              p.age_range as pet_age, p.size as pet_size, p.last_vaccine_date, p.vaccine_types,
-                              p.custom_vaccine, p.vaccination_proof
-                              FROM appointments a
-                              JOIN pets p ON a.pet_id = p.id
-                              WHERE a.id = ? AND a.user_id = ?");
-        $stmt->execute([$appointmentId, $decoded->user_id]);
+        // Get user role from database
+        $stmt = $db->prepare("SELECT role FROM users WHERE id = ? AND is_active = 1");
+        $stmt->execute([$decoded->user_id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            throw new Exception('User not found or inactive');
+        }
+
+        // Build query based on user role
+        $query = "SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
+                  a.total_amount, a.status, a.special_instructions, a.package_customizations,
+                  p.id as pet_id, p.name as pet_name, p.type as pet_type, p.breed as pet_breed,
+                  p.age_range as pet_age, p.size as pet_size, p.last_vaccine_date, p.vaccine_types,
+                  p.custom_vaccine, p.vaccination_proof
+                  FROM appointments a
+                  JOIN pets p ON a.pet_id = p.id
+                  WHERE a.id = ?";
+
+        $params = [$appointmentId];
+
+        // If not admin/manager/staff/cashier, restrict to user's own appointments
+        if (!in_array($user['role'], ['admin', 'manager', 'staff', 'cashier'])) {
+            $query .= " AND a.user_id = ?";
+            $params[] = $decoded->user_id;
+        }
+
+        $stmt = $db->prepare($query);
+        $stmt->execute($params);
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$appointment) {
@@ -661,6 +733,215 @@ function handleGetAppointmentDetails() {
 
     } catch(Exception $e) {
         http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
+function handleGetAllAppointments() {
+    $decoded = requireAuth();
+
+    // Get user role from database
+    $db = getDB();
+    $stmt = $db->prepare("SELECT role FROM users WHERE id = ? AND is_active = 1");
+    $stmt->execute([$decoded->user_id]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$user) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'User not found or inactive']);
+        exit;
+    }
+
+    // Allow all authenticated users to view all appointments (customers can see all appointments)
+    // No role restriction needed
+
+    try {
+        $db = getDB();
+        $status = isset($_GET['status']) && $_GET['status'] !== 'all' ? $_GET['status'] : null;
+        $month = isset($_GET['month']) && !empty($_GET['month']) ? $_GET['month'] : null;
+        $year = isset($_GET['year']) && !empty($_GET['year']) ? $_GET['year'] : null;
+
+        $query = "SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
+                  a.total_amount, a.status, a.special_instructions, a.package_customizations,
+                  a.cancelled_by, a.cancelled_by_name, a.cancellation_remarks,
+                  p.name as pet_name, p.type as pet_type, p.breed as pet_breed, p.size as pet_size,
+                  p.last_vaccine_date, p.vaccine_types, p.custom_vaccine, p.vaccination_proof,
+                  u.full_name as owner_name, u.email as owner_email
+                  FROM appointments a
+                  LEFT JOIN pets p ON a.pet_id = p.id
+                  LEFT JOIN users u ON a.user_id = u.id";
+
+        $params = [];
+        $conditions = [];
+
+        if ($status) {
+            $conditions[] = "a.status = ?";
+            $params[] = $status;
+        }
+
+        if ($month && $year) {
+            $conditions[] = "MONTH(a.appointment_date) = ? AND YEAR(a.appointment_date) = ?";
+            $params[] = $month;
+            $params[] = $year;
+        } elseif ($month) {
+            $conditions[] = "MONTH(a.appointment_date) = ?";
+            $params[] = $month;
+        } elseif ($year) {
+            $conditions[] = "YEAR(a.appointment_date) = ?";
+            $params[] = $year;
+        }
+
+        if (!empty($conditions)) {
+            $query .= " WHERE " . implode(" AND ", $conditions);
+        }
+
+        $query .= " ORDER BY a.appointment_date DESC, a.appointment_time DESC";
+
+        $stmt = $db->prepare($query);
+        $stmt->execute($params);
+        $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Get services for each appointment
+        foreach ($appointments as &$appointment) {
+            $stmt = $db->prepare("SELECT s.name, s.category, aps.price
+                                FROM appointment_services aps
+                                JOIN services2 s ON aps.service_id = s.id
+                                WHERE aps.appointment_id = ?");
+            $stmt->execute([$appointment['id']]);
+            $appointment['services'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'appointments' => $appointments
+        ]);
+    } catch(Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
+function handleAdmitAppointment($input) {
+    $decoded = requireAuth();
+
+    try {
+        // Validate required fields
+        if (!isset($input['appointment_id']) || empty($input['appointment_id'])) {
+            throw new Exception('Appointment ID is required');
+        }
+
+        $appointmentId = intval($input['appointment_id']);
+        $db = getDB();
+
+        // Get user role
+        $stmt = $db->prepare("SELECT role FROM users WHERE id = ? AND is_active = 1");
+        $stmt->execute([$decoded->user_id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user || !in_array($user['role'], ['admin', 'manager', 'staff', 'cashier'])) {
+            throw new Exception('Access denied. Insufficient permissions.');
+        }
+
+        // Get appointment details
+        $stmt = $db->prepare("SELECT id, appointment_date, appointment_time, status FROM appointments WHERE id = ?");
+        $stmt->execute([$appointmentId]);
+        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$appointment) {
+            throw new Exception('Appointment not found');
+        }
+
+        // Check if appointment is already admitted/confirmed
+        if ($appointment['status'] !== 'scheduled') {
+            throw new Exception('Appointment is not in scheduled status and cannot be admitted');
+        }
+
+        // Check if appointment date is today or in the past (allow admitting on the day of appointment)
+        $appointmentDateTime = new DateTime($appointment['appointment_date'] . ' ' . $appointment['appointment_time']);
+        $now = new DateTime(); // Current date and time
+
+        // Allow admitting if the appointment date/time is in the past OR if it's today
+        $appointmentDate = new DateTime($appointment['appointment_date']);
+        $appointmentDate->setTime(0, 0, 0); // Set to start of appointment date
+        $today = new DateTime();
+        $today->setTime(0, 0, 0); // Set to start of today
+
+        // If appointment is in the future (not today), don't allow admitting
+        if ($appointmentDate > $today) {
+            throw new Exception('Cannot admit appointment before the scheduled date. Appointment can only be admitted on or after ' . $appointmentDate->format('M j, Y'));
+        }
+
+        // If appointment is today, check if the time has passed or is current
+        if ($appointmentDate == $today && $appointmentDateTime > $now) {
+            throw new Exception('Cannot admit appointment before the scheduled time. Please wait until ' . $appointmentDateTime->format('g:i A') . ' or later.');
+        }
+
+        // Update appointment status to confirmed (admitted)
+        $stmt = $db->prepare("UPDATE appointments SET status = 'confirmed' WHERE id = ?");
+        $stmt->execute([$appointmentId]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Appointment admitted successfully'
+        ]);
+
+    } catch(Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
+function handleAutoCancelOverdueAppointments() {
+    try {
+        $db = getDB();
+
+        // Get current date and time
+        $now = new DateTime();
+        $currentDate = $now->format('Y-m-d');
+        $currentTime = $now->format('H:i:s');
+
+        // Find appointments that are:
+        // 1. Still in "scheduled" status
+        // 2. On today's date or earlier
+        // 3. Current time is past 5:00 PM (17:00:00)
+        $stmt = $db->prepare("
+            SELECT id, appointment_date, appointment_time
+            FROM appointments
+            WHERE status = 'scheduled'
+            AND appointment_date <= ?
+            AND (
+                appointment_date < ? OR
+                (appointment_date = ? AND ? >= '17:00:00')
+            )
+        ");
+        $stmt->execute([$currentDate, $currentDate, $currentDate, $currentTime]);
+        $overdueAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $cancelledCount = 0;
+
+        foreach ($overdueAppointments as $appointment) {
+            // Auto-cancel the appointment
+            $cancelStmt = $db->prepare("
+                UPDATE appointments
+                SET status = 'cancelled',
+                    cancelled_by = 0,
+                    cancelled_by_name = 'System',
+                    cancellation_remarks = 'Customer did not arrive'
+                WHERE id = ?
+            ");
+            $cancelStmt->execute([$appointment['id']]);
+            $cancelledCount++;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Auto-cancelled {$cancelledCount} overdue appointments",
+            'cancelled_count' => $cancelledCount,
+            'appointments_cancelled' => array_column($overdueAppointments, 'id')
+        ]);
+
+    } catch(Exception $e) {
+        http_response_code(500);
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
 }

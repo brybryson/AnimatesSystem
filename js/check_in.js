@@ -6,6 +6,7 @@ let bookingId = null;
 let rfidPollingInterval = null;
 let rfidAssigned = false;
 let lastNotifiedError = null; // Track last error to prevent spam
+let lastRFIDNotification = null; // Track last RFID notification to prevent spam
 let servicesData = {};
 let currentPetSize = '';
 // API base URL - adjust this to your server location
@@ -639,6 +640,21 @@ function validatePetInfo() {
         // File is already stored in petData.vaccinationProof from the upload handler
     }
 
+    // Validate that last vaccine date is not in the future
+    const lastVaccineDateInput = document.getElementById('lastVaccineDate');
+    if (lastVaccineDateInput.value) {
+        const selectedDate = new Date(lastVaccineDateInput.value);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time to start of day
+        if (selectedDate >= today) {
+            lastVaccineDateInput.classList.add('border-red-500');
+            isValid = false;
+            showNotification('Last vaccine update date must be in the past', 'error');
+        } else {
+            lastVaccineDateInput.classList.remove('border-red-500');
+        }
+    }
+
     // No custom pet type handling needed (removed "others" option)
 
     // Validate pet breed
@@ -1051,9 +1067,10 @@ function startRFIDAssignment() {
     const rfidStatus = document.getElementById('rfidStatus');
     const rfidMessage = document.getElementById('rfidMessage');
     const assignedTag = document.getElementById('assignedTag');
-    
-    // Reset RFID state
+
+    // Reset RFID state and notification tracking
     rfidAssigned = false;
+    lastRFIDNotification = null;
     
     // Update booking summary
     updateBookingSummary();
@@ -1115,8 +1132,9 @@ function stopRFIDPolling() {
         clearInterval(rfidPollingInterval);
         rfidPollingInterval = null;
     }
-    // Reset error tracking when stopping
+    // Reset error and RFID notification tracking when stopping
     lastNotifiedError = null;
+    lastRFIDNotification = null;
 }
 
 function handleRFIDDetection(rfidData) {
@@ -1162,11 +1180,17 @@ function handleRFIDDetection(rfidData) {
     } else {
         // Get physical card number for subsequent taps too
         const physicalCardNumber = getPhysicalCardNumber(rfidData.cardUID);
-        
+
         // Subsequent tap - show status update message
         rfidStatus.textContent = `RFID Tap #${rfidData.tapCount} Detected`;
         rfidMessage.textContent = `${physicalCardNumber} - Pet status updated`;
-        showNotification(`${physicalCardNumber} tap #${rfidData.tapCount} logged - Status updated`, 'info');
+
+        // Only show notification once per RFID card detection, not per tap
+        const cardNotificationKey = `${physicalCardNumber}-status-update`;
+        if (lastRFIDNotification !== cardNotificationKey) {
+            lastRFIDNotification = cardNotificationKey;
+            showNotification(`${physicalCardNumber} detected - Status updated`, 'info');
+        }
     }
 }
 
@@ -1654,14 +1678,14 @@ function generatePDFReceipt() {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('Thank you for choosing 8Paws!', 40, yPos, { align: 'center' });
+    doc.text('Thank you for choosing Animates!', 40, yPos, { align: 'center' });
     yPos += 3;
     doc.setFont('helvetica', 'normal');
     doc.text('Your pet is in good hands', 40, yPos, { align: 'center' });
     
     // Save PDF
     const cleanPetName = (petData.petName || 'Pet').replace(/[^a-zA-Z0-9]/g, '');
-    const fileName = `8Paws_CompactReceipt_${cleanPetName}_${currentDate.toISOString().slice(0, 10)}.pdf`;
+    const fileName = `Animates_CompactReceipt_${cleanPetName}_${currentDate.toISOString().slice(0, 10)}.pdf`;
     doc.save(fileName);
 }
 
@@ -1669,8 +1693,41 @@ function generatePDFReceipt() {
 // Initialize progress
 updateProgress(1);
 
+// Function to update max date for vaccine date input
+function updateVaccineDateMax() {
+    const lastVaccineDateInput = document.getElementById('lastVaccineDate');
+    if (lastVaccineDateInput) {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        const maxDate = yesterday.toISOString().split('T')[0];
+        lastVaccineDateInput.max = maxDate;
+    }
+}
+
 // Initialize vaccination form handlers
 function initializeVaccinationHandlers() {
+    // Set max date for last vaccine date to yesterday and enforce no future dates
+    updateVaccineDateMax();
+
+    const lastVaccineDateInput = document.getElementById('lastVaccineDate');
+    if (lastVaccineDateInput) {
+        // Add change listener to enforce no future dates
+        lastVaccineDateInput.addEventListener('change', function() {
+            const selectedDate = new Date(this.value);
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            if (selectedDate >= todayStart) {
+                this.value = '';
+                showNotification('Please select a date from the past. Future dates are not allowed.', 'error');
+            }
+        });
+    }
+
+    // Update max date every minute in case system date changes
+    setInterval(updateVaccineDateMax, 60000);
+
     // Vaccine type multi-select change handler
     const vaccineTypeSelect = document.getElementById('vaccineType');
     if (vaccineTypeSelect) {
