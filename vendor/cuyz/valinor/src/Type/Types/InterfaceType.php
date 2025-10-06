@@ -6,12 +6,12 @@ namespace CuyZ\Valinor\Type\Types;
 
 use CuyZ\Valinor\Compiler\Native\ComplianceNode;
 use CuyZ\Valinor\Type\CombiningType;
-use CuyZ\Valinor\Type\CompositeType;
 use CuyZ\Valinor\Type\GenericType;
 use CuyZ\Valinor\Type\ObjectType;
 use CuyZ\Valinor\Type\Type;
 
 use function array_map;
+use function array_values;
 
 /** @internal */
 final class InterfaceType implements ObjectType, GenericType
@@ -62,17 +62,7 @@ final class InterfaceType implements ObjectType, GenericType
 
     public function traverse(): array
     {
-        $types = [];
-
-        foreach ($this->generics as $type) {
-            $types[] = $type;
-
-            if ($type instanceof CompositeType) {
-                $types = [...$types, ...$type->traverse()];
-            }
-        }
-
-        return $types;
+        return array_values($this->generics);
     }
 
     public function nativeType(): InterfaceType
@@ -84,6 +74,6 @@ final class InterfaceType implements ObjectType, GenericType
     {
         return empty($this->generics)
             ? $this->interfaceName
-            : $this->interfaceName . '<' . implode(', ', array_map(fn (Type $type) => $type->toString(), $this->generics)) . '>';
+            : $this->interfaceName . '<' . implode(', ', array_map(static fn (Type $type) => $type->toString(), $this->generics)) . '>';
     }
 }

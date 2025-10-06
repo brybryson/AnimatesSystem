@@ -42,7 +42,7 @@ function getServicesWithPricing($db) {
     try {
         // Use services2 table directly since we know it has the correct structure
         $query = "
-            SELECT 
+            SELECT
                 s.id,
                 s.name,
                 s.description,
@@ -54,21 +54,21 @@ function getServicesWithPricing($db) {
             FROM services2 s
             LEFT JOIN service_pricing sp ON s.id = sp.service_id
             WHERE s.status = 'active'
-            ORDER BY 
+            ORDER BY
                 FIELD(s.category, 'basic', 'premium', 'addon'),
                 s.id,
                 FIELD(sp.pet_size, 'small', 'medium', 'large', 'extra_large')
         ";
-        
+
         $stmt = $db->prepare($query);
         $stmt->execute();
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         // Group services and their pricing
         $services = [];
         foreach ($results as $row) {
             $serviceId = $row['id'];
-            
+
             if (!isset($services[$serviceId])) {
                 $services[$serviceId] = [
                     'id' => $row['id'],
@@ -80,28 +80,31 @@ function getServicesWithPricing($db) {
                     'pricing' => []
                 ];
             }
-            
+
             if ($row['pet_size'] && $row['price']) {
                 $services[$serviceId]['pricing'][$row['pet_size']] = floatval($row['price']);
             }
         }
-        
+
+        // Check inventory availability for each service
+        $servicesWithInventory = checkServiceInventoryAvailability($db, $services);
+
         // Convert to indexed array grouped by category
         $groupedServices = [
             'basic' => [],
             'package' => [],
             'addon' => []
         ];
-        
-        foreach ($services as $service) {
+
+        foreach ($servicesWithInventory as $service) {
             $groupedServices[$service['category']][] = $service;
         }
-        
+
         echo json_encode([
             'success' => true,
             'services' => $groupedServices
         ]);
-        
+
     } catch(Exception $e) {
         throw new Exception('Failed to fetch services: ' . $e->getMessage());
     }
@@ -113,14 +116,78 @@ function getPetSizes($db) {
         $stmt = $db->prepare($query);
         $stmt->execute();
         $petSizes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         echo json_encode([
             'success' => true,
             'pet_sizes' => $petSizes
         ]);
-        
+
     } catch(Exception $e) {
         throw new Exception('Failed to fetch pet sizes: ' . $e->getMessage());
     }
+}
+
+function checkServiceInventoryAvailability($db, $services) {
+    // Define service-to-inventory mappings
+    $serviceInventoryMap = [
+        // Basic Services
+        'Bath & Dry' => ['Premium Shampoo'],
+        'Nail Trimming & Grinding' => ['Professional Nail Clippers', 'Nail Grinding File'],
+        'Ear Cleaning & Inspection' => ['Cotton Swabs', 'Ear Cleaning Solution'],
+        'Haircut & Styling' => ['Clipper Machine', 'Professional Shears Set'],
+        'Teeth Cleaning' => ['Dental Cleaning Solution', 'Pet Toothbrush Set'],
+        'De-shedding Treatment' => ['De-shedding Shampoo'],
+
+        // Add-Ons
+        'Extra Nail Polish' => ['Nail Polish - Clear'],
+        'Scented Cologne' => ['Scented Cologne'],
+        'Bow or Bandana' => ['Decorative Bows Set', 'Bandana Set'],
+        'Paw Balm' => ['Paw Balm'],
+        'Whitening Shampoo' => ['Whitening Shampoo'],
+        'Flea & Tick Treatment' => ['Flea & Tick Spray'],
+
+        // Packages (will be checked based on their included services)
+        'Essential Grooming Package' => ['Premium Shampoo', 'Professional Nail Clippers', 'Cotton Swabs', 'Ear Cleaning Solution'],
+        'Full Grooming Package' => ['Premium Shampoo', 'Clipper Machine', 'Professional Shears Set', 'Professional Nail Clippers', 'Cotton Swabs', 'Ear Cleaning Solution', 'Dental Cleaning Solution', 'Pet Toothbrush Set', 'De-shedding Shampoo'],
+        'Bath & Brush Package' => ['Premium Shampoo', 'De-shedding Shampoo'],
+        'Spa Relaxation Package' => ['Premium Shampoo', 'Paw Balm', 'Scented Cologne']
+    ];
+
+    // Get all inventory items
+    $stmt = $db->prepare("SELECT name, quantity FROM inventory");
+    $stmt->execute();
+    $inventoryItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Create inventory lookup array
+    $inventoryLookup = [];
+    foreach ($inventoryItems as $item) {
+        $inventoryLookup[$item['name']] = $item['quantity'];
+    }
+
+    // Check each service
+    foreach ($services as &$service) {
+        $serviceName = $service['name'];
+        $requiredItems = $serviceInventoryMap[$serviceName] ?? [];
+
+        $service['available'] = true;
+        $service['unavailable_reason'] = '';
+        $service['out_of_stock_items'] = [];
+
+        if (!empty($requiredItems)) {
+            foreach ($requiredItems as $itemName) {
+                if (!isset($inventoryLookup[$itemName]) || $inventoryLookup[$itemName] <= 0) {
+                    $service['available'] = false;
+                    $service['out_of_stock_items'][] = $itemName;
+                }
+            }
+
+            if (!$service['available']) {
+                $outOfStockList = implode(', ', $service['out_of_stock_items']);
+                $service['unavailable_reason'] = "Out of stock: {$outOfStockList}";
+            }
+        }
+    }
+
+    return $services;
 }
 ?>

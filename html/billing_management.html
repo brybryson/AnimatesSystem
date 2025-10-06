@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>8Paws - Billing Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        primary: '#D4AF37', 
+                        primary: '#D4AF37',
                         secondary: '#8C7A1E',
                         gold: {
                             50: '#FFFBEB',
@@ -41,34 +42,32 @@
     </style>
 </head>
 <body class="gradient-bg min-h-screen flex flex-col">
-    <!-- Minimal decorative background -->
+    <!-- Decorative background elements -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-gold-200/20 to-gold-300/10 rounded-full blur-2xl"></div>
-        <div class="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-gold-100/20 to-gold-200/10 rounded-full blur-2xl"></div>
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-gold-200/30 to-gold-300/20 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-gold-100/30 to-gold-200/20 rounded-full blur-3xl"></div>
     </div>
 
-    <!-- Compact Header -->
-    <header class="relative bg-white/80 backdrop-blur-sm shadow-sm border-b border-gold-100 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between items-center py-3">
-                <div class="flex items-center space-x-3">
-                    <img src="../animates_logo.png" alt="8Paws Logo" class="h-10 w-10 object-contain">
+    <header class="relative bg-white/80 backdrop-blur-sm shadow-sm border-b border-gold-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-gold-200 rounded-full blur-sm"></div>
+                        <img src="../animates_logo.png" alt="Animates Logo" class="relative h-14 w-14 object-contain">
+                    </div>
                     <div>
-                        <p class="text-sm font-semibold text-gold-700">Animates PH</p>
-                        <p class="text-xs text-gold-600">Billing Management</p>
+                        <p class="text-lg font-semibold text-gold-700">Animates PH</p>
+                        <p class="text-sm text-gold-600 font-medium">Camaro Branch</p>
+                        <p class="text-xs text-gray-500">Billing Management</p>
                     </div>
                 </div>
-                
                 <!-- Navigation -->
                 <nav class="hidden md:flex items-center space-x-6">
-                    <a href="dashboard_employees.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Dashboard</a>
-                    <a href="appointments_employees.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Appointments</a>
-                    <a href="admin_accounts.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">User Management</a>
                     <a href="billing_management.html" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">Billing</a>
-                    <a href="reports.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Reports</a>
 
                     <div class="border-l border-gray-300 pl-6 ml-2">
-                        <button onclick="logout()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600">
+                        <button onclick="signOut()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
                             </svg>
@@ -77,23 +76,39 @@
                     </div>
                 </nav>
 
-                <!-- User Info -->
-                <div class="flex items-center space-x-3">
-                    <div class="text-right hidden sm:block">
-                        <p class="text-xs font-medium text-gray-900" id="userName">Cashier</p>
-                        <p class="text-xs text-gray-500" id="userRole">Billing Staff</p>
+                <!-- Mobile menu button -->
+                <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Mobile Navigation -->
+            <div id="mobileMenu" class="md:hidden hidden pb-4">
+                <div class="flex flex-col space-y-2">
+                    <a href="billing_management.html" class="mobile-nav-link text-gold-600 font-semibold py-2 transition-colors duration-200">Billing</a>
+
+                    <div class="border-t border-gray-300 pt-3 mt-3">
+                        <button onclick="signOut()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600 py-2 w-full text-left">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
                     </div>
-                    <div class="w-8 h-8 bg-gradient-to-br from-gold-500 to-gold-600 rounded-full flex items-center justify-center text-white font-medium text-sm" id="userInitials">
-                        C
-                    </div>
-                    <button id="logoutBtn" class="ml-2 px-2 py-1 text-xs border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 hidden sm:block">Sign out</button>
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="flex-grow px-4 py-4">
+    <main class="relative flex-grow px-4 sm:px-6 lg:px-8 py-8">
         <div class="max-w-7xl mx-auto">
+            <!-- Page Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Billing Management</h1>
+                <p class="text-gray-600">Process payments and manage transactions</p>
+            </div>
         <!-- Compact Stats Overview -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div id="todayRevenueCard" class="bg-white/90 backdrop-blur-sm rounded-xl card-shadow border border-gold-100/50 p-4 cursor-pointer">
@@ -105,7 +120,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-xs font-medium text-gray-600">Today's Revenue</p>
-                            <p class="text-lg font-bold text-gray-900" id="todayRevenue">₱0</p>
+                            <p class="text-lg font-bold text-gray-900" id="todayRevenue">₱0.00</p>
                     </div>
                 </div>
             </div>
@@ -147,7 +162,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-xs font-medium text-gray-600">This Week</p>
-                            <p class="text-lg font-bold text-gray-900" id="weekRevenue">₱0</p>
+                            <p class="text-lg font-bold text-gray-900" id="weekRevenue">₱0.00</p>
                     </div>
                 </div>
             </div>
@@ -310,19 +325,19 @@
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                     <div class="flex justify-between">
                                         <span class="text-gray-600">Subtotal:</span>
-                                        <span id="billSubtotal" class="font-medium">₱0</span>
+                                        <span id="billSubtotal" class="font-medium">₱0.00</span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-gray-600">Discount:</span>
-                                        <span class="text-green-600 font-medium">-<span id="billDiscount">₱0</span></span>
+                                        <span class="text-green-600 font-medium">-<span id="billDiscount">₱0.00</span></span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-gray-600">Tax (12%):</span>
-                                        <span id="billTax" class="font-medium">₱0</span>
+                                        <span id="billTax" class="font-medium">₱0.00</span>
                                     </div>
                                     <div class="flex justify-between text-lg font-bold">
                                         <span class="text-gray-900">Total:</span>
-                                        <span class="text-gold-600" id="billTotal">₱0</span>
+                                        <span class="text-gold-600" id="billTotal">₱0.00</span>
                                     </div>
                                 </div>
                             </div>
@@ -378,7 +393,7 @@
                                     <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
                                         <div class="flex justify-between items-center">
                                             <span class="text-sm font-medium text-green-800">Change:</span>
-                                            <span class="text-lg font-bold text-green-600" id="changeAmount">₱0</span>
+                                            <span class="text-lg font-bold text-green-600" id="changeAmount">₱0.00</span>
                                         </div>
                                     </div>
                                 </div>
@@ -570,9 +585,19 @@
             </div>
         </section>
     </div>
-    </main>
+</main>
 
-    <!-- Success Modal -->
+<!-- Footer -->
+<footer class="bg-white border-t mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="text-center text-sm text-gray-500">
+            <p>&copy; 2025 Animates Pet Boutique & Grooming Salon. Professional Pet Care Services.</p>
+            <p class="mt-2">📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567 | 📧 animates.ph.fairview@gmail.com</p>
+        </div>
+    </div>
+</footer>
+
+<!-- Success Modal -->
     <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 card-shadow">
             <div class="text-center">
@@ -624,7 +649,7 @@
                 <h3 class="text-xl font-bold text-gray-900 mb-2">Void Transaction</h3>
                 <p class="text-gray-600 text-sm">This action cannot be undone. Please provide a reason for voiding this transaction.</p>
             </div>
-            
+
             <!-- Transaction Details -->
             <div class="bg-gray-50 rounded-lg p-4 mb-4 text-sm">
                 <div class="grid grid-cols-2 gap-4">
@@ -646,7 +671,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Void Reason Form -->
             <form id="voidForm" class="space-y-4">
                 <div>
@@ -663,16 +688,16 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
-                    <textarea id="voidNotes" rows="3" placeholder="Provide additional details..." 
+                    <textarea id="voidNotes" rows="3" placeholder="Provide additional details..."
                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"></textarea>
                 </div>
-                
+
                 <div class="flex justify-center space-x-3 pt-4">
-                    <button type="button" onclick="closeVoidModal()" 
+                    <button type="button" onclick="closeVoidModal()"
                             class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium">
                         Cancel
                     </button>
-                    <button type="submit" 
+                    <button type="submit"
                             class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
                         Confirm Void
                     </button>
@@ -681,6 +706,197 @@
         </div>
     </div>
 
+    <!-- Report Generation Modal -->
+    <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl w-auto max-w-2xl mx-4 card-shadow overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900">Generate Business Report</h3>
+                        <p class="text-sm text-gray-600">Select date range to preview report data before downloading</p>
+                    </div>
+                </div>
+                <button onclick="closeReportModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 space-y-6">
+                <!-- Report Form and Preview -->
+                <div class="space-y-6">
+                    <!-- Step 1: Date Selection Form -->
+                    <div id="reportFormSection">
+                        <form id="reportForm" class="space-y-4">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+                                    <select id="reportType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <option value="comprehensive">Comprehensive Business Report</option>
+                                        <option value="transactions">Transaction Details Only</option>
+                                        <option value="summary">Summary Report Only</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                                    <select id="reportDateRange" onchange="handleDateRangeChange()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <option value="today">Today</option>
+                                        <option value="yesterday">Yesterday</option>
+                                        <option value="week">This Week</option>
+                                        <option value="last_week">Last Week</option>
+                                        <option value="month">This Month</option>
+                                        <option value="last_month">Last Month</option>
+                                        <option value="custom">Custom Range</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Custom Date Range (hidden by default) -->
+                            <div id="customDateRange" class="hidden space-y-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
+                                    <input type="date" id="reportStartDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">End Date</label>
+                                    <input type="date" id="reportEndDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Step 2: Report Preview -->
+                    <div id="reportPreviewSection" class="hidden">
+                    <!-- Report Summary -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-3">Report Summary</h4>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                    <span class="font-medium text-gray-700">Report Type:</span>
+                                    <span id="previewReportType" class="ml-2 text-gray-900">-</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium text-gray-700">Date Range:</span>
+                                    <span id="previewDateRange" class="ml-2 text-gray-900">-</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium text-gray-700">Total Records:</span>
+                                    <span id="previewTotalRecords" class="ml-2 text-gray-900">-</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium text-gray-700">Generated:</span>
+                                    <span id="previewGeneratedTime" class="ml-2 text-gray-900">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Report Content Preview -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-3">Report Preview</h4>
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="max-h-96 overflow-y-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-gray-50 sticky top-0">
+                                        <tr id="previewTableHeader">
+                                            <!-- Headers will be populated dynamically -->
+                                        </tr>
+                                    </thead>
+                                    <tbody id="previewTableBody" class="divide-y divide-gray-200">
+                                        <!-- Preview data will be populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex justify-end items-center pt-4 border-t border-gray-200">
+                        <div class="flex space-x-3">
+                            <button onclick="closeReportModal()"
+                                    class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium">
+                                Cancel
+                            </button>
+                            <button onclick="downloadReport()"
+                                    class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
+                                Download Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mobile menu toggle function
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Sign out function
+        function signOut() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_role');
+            localStorage.removeItem('auth_email');
+            localStorage.removeItem('auth_staff_role');
+            localStorage.removeItem('auth_user_id');
+
+            // Prevent back navigation by replacing current history entry
+            history.replaceState(null, null, 'admin_staff_auth.html');
+
+            // Redirect to login page
+            window.location.href = 'admin_staff_auth.html';
+        }
+
+        // Authentication check
+        function checkAuthentication() {
+            const token = localStorage.getItem('auth_token');
+            const role = localStorage.getItem('auth_role');
+
+            if (!token || !role) {
+                // No authentication found, redirect to login
+                window.location.href = 'admin_staff_auth.html';
+                return false;
+            }
+
+            // Check if user has appropriate role for billing
+            if (!['admin', 'cashier'].includes(role)) {
+                // Invalid role, redirect to login
+                localStorage.clear(); // Clear invalid auth data
+                window.location.href = 'admin_staff_auth.html';
+                return false;
+            }
+
+            return true;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check authentication first
+            if (!checkAuthentication()) {
+                return; // Stop execution if not authenticated
+            }
+        });
+    </script>
+    <script>
+    // Fallback sign-out handler to ensure the Sign out button always works
+    function signOut() {
+        try { localStorage.clear(); } catch (e) {}
+        window.location.replace('admin_staff_auth.html');
+    }
+    </script>
     <script src="../js/billing_management.js"></script>
 </body>
 </html>

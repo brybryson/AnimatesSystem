@@ -129,50 +129,50 @@ function getLatestRFIDFromMySQL() {
 function isRFIDAvailableForBooking($db, $customUID, $cardId) {
     // Check if RFID card is being used in any active booking
     $stmt = $db->prepare("
-        SELECT COUNT(*) as count 
-        FROM bookings 
-        WHERE (custom_rfid = ? OR rfid_card_id = ?) 
+        SELECT COUNT(*) as count
+        FROM bookings
+        WHERE custom_rfid = ?
         AND status NOT IN ('completed', 'cancelled')
     ");
-    $stmt->execute([$customUID, $cardId]);
+    $stmt->execute([$customUID]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     return $result['count'] == 0;
 }
 
 function updatePetStatusByRFID($customUID) {
     try {
         $db = getDB();
-        
-        // Find active booking by custom_uid or rfid_card_id
+
+        // Find active booking by custom_rfid
         $stmt = $db->prepare("
-            SELECT b.id, b.status, b.rfid_card_id
-            FROM bookings b 
-            WHERE b.custom_rfid = ? 
+            SELECT b.id, b.status
+            FROM bookings b
+            WHERE b.custom_rfid = ?
             AND b.status NOT IN ('completed', 'cancelled')
-            ORDER BY b.created_at DESC 
+            ORDER BY b.created_at DESC
             LIMIT 1
         ");
         $stmt->execute([$customUID]);
         $booking = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if ($booking) {
             // Update status based on current status
             $newStatus = getNextStatus($booking['status']);
             if ($newStatus) {
                 $stmt = $db->prepare("UPDATE bookings SET status = ?, updated_at = NOW() WHERE id = ?");
                 $stmt->execute([$newStatus, $booking['id']]);
-                
+
                 // Create status update log
-                $stmt = $db->prepare("INSERT INTO status_updates (booking_id, status, notes) VALUES (?, ?, ?)");
+                $stmt = $db->prepare("INSERT INTO status_updates (booking_id, status, notes, created_at) VALUES (?, ?, ?, NOW())");
                 $stmt->execute([$booking['id'], $newStatus, "Status updated via RFID tap"]);
-                
+
                 // If booking is completed, the RFID card becomes available again
                 if ($newStatus === 'completed') {
                     error_log("Booking completed: RFID {$customUID} is now available for reuse");
                 }
-                
-                error_log("Pet status updated: Booking ID {$booking['id']} -> {$newStatus}");
+
+                error_log("Booking status updated: Booking ID {$booking['id']} -> {$newStatus}");
             }
         } else {
             error_log("No active booking found for RFID: {$customUID}");
@@ -183,13 +183,12 @@ function updatePetStatusByRFID($customUID) {
 }
 
 function getNextStatus($currentStatus) {
+    // Map appointment statuses for RFID progression
     $statusFlow = [
-        'checked-in' => 'bathing',
-        'bathing' => 'grooming', 
-        'grooming' => 'ready',
-        'ready' => 'completed'
+        'confirmed' => 'in-progress',    // First tap: confirmed -> in-progress
+        'in-progress' => 'completed'     // Second tap: in-progress -> completed
     ];
-    
+
     return $statusFlow[$currentStatus] ?? null;
 }
 
@@ -302,7 +301,7 @@ function handleCheckin() {
         
         // Create booking
         $bookingId = createBooking($db, $petId, $rfidCard['id'], $input);
-        
+
         // Add services to booking
         if (!empty($input['services'])) {
             addServicesToBooking($db, $bookingId, $input['services']);
@@ -312,20 +311,19 @@ function handleCheckin() {
         if (!empty($input['packageCustomizations'])) {
             storePackageCustomizations($db, $bookingId, $input['packageCustomizations']);
         }
-        
+
         // Create initial status update
-        createStatusUpdate($db, $bookingId, 'checked-in', 'Initial check-in completed');
-        
+        createBookingStatusUpdate($db, $bookingId, 'confirmed', 'Initial check-in completed');
+
         // Update RFID card to mark it as currently booked
         $stmt = $db->prepare("UPDATE rfid_cards SET is_currently_booked = 1 WHERE id = ?");
         $stmt->execute([$rfidCard['id']]);
         
-        // Update booking with welcome email flag
-        $stmt = $db->prepare("UPDATE bookings SET welcome_email_sent = 0 WHERE id = ?");
-        $stmt->execute([$bookingId]);
-        
         // Commit transaction
         $db->commit();
+
+        // Subtract inventory for booked services
+        subtractInventoryForServices($db, array_column($input['services'] ?? [], 'name'));
 
         // Debug file upload status
         $fileUploadStatus = 'No vaccination proof';
@@ -346,10 +344,10 @@ function handleCheckin() {
         try {
             // Send booking confirmation email
             $emailSent = sendBookingConfirmationEmail($bookingId);
-            
+
             // Send tracking link email
             $trackingEmailSent = sendTrackingLinkEmail($bookingId, $input['ownerEmail'], $input['customRFID']);
-            
+
             // Update email sent flags if successful
             if ($emailSent || $trackingEmailSent) {
                 $stmt = $db->prepare("UPDATE bookings SET welcome_email_sent = 1 WHERE id = ?");
@@ -359,7 +357,7 @@ function handleCheckin() {
             error_log("Email sending failed: " . $emailError->getMessage());
             // Don't fail the entire booking if email fails
         }
-        
+
         // Remove lock file on success
         if (file_exists($lockFile)) {
             unlink($lockFile);
@@ -535,10 +533,10 @@ function createPet($db, $customerId, $input) {
 
 function createBooking($db, $petId, $rfidCardId, $input) {
     $stmt = $db->prepare("
-        INSERT INTO bookings (pet_id, rfid_card_id, custom_rfid, total_amount, estimated_completion) 
-        VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 2 HOUR))
+        INSERT INTO bookings (user_id, pet_id, custom_rfid, total_amount, status, payment_status, booking_type, check_in_time, estimated_completion)
+        VALUES (NULL, ?, ?, ?, 'checked-in', 'paid', 'walk_in', NOW(), DATE_ADD(NOW(), INTERVAL 2 HOUR))
     ");
-    $stmt->execute([$petId, $rfidCardId, $input['customRFID'], $input['totalAmount'] ?? 0]);
+    $stmt->execute([$petId, $input['customRFID'], $input['totalAmount'] ?? 0]);
     return $db->lastInsertId();
 }
 
@@ -549,7 +547,7 @@ function addServicesToBooking($db, $bookingId, $services) {
             $stmt = $db->prepare("SELECT id, price FROM services WHERE name = ?");
             $stmt->execute([$service['name']]);
             $serviceData = $stmt->fetch(PDO::FETCH_ASSOC);
-            
+
             if ($serviceData) {
                 $stmt = $db->prepare("INSERT INTO booking_services (booking_id, service_id, price) VALUES (?, ?, ?)");
                 $stmt->execute([$bookingId, $serviceData['id'], $service['price'] ?? $serviceData['price']]);
@@ -558,7 +556,7 @@ function addServicesToBooking($db, $bookingId, $services) {
                 $stmt = $db->prepare("INSERT INTO services (name, description, price) VALUES (?, ?, ?)");
                 $stmt->execute([$service['name'], $service['name'], $service['price']]);
                 $newServiceId = $db->lastInsertId();
-                
+
                 $stmt = $db->prepare("INSERT INTO booking_services (booking_id, service_id, price) VALUES (?, ?, ?)");
                 $stmt->execute([$bookingId, $newServiceId, $service['price']]);
             }
@@ -566,8 +564,8 @@ function addServicesToBooking($db, $bookingId, $services) {
     }
 }
 
-function createStatusUpdate($db, $bookingId, $status, $notes) {
-    $stmt = $db->prepare("INSERT INTO status_updates (booking_id, status, notes) VALUES (?, ?, ?)");
+function createBookingStatusUpdate($db, $bookingId, $status, $notes) {
+    $stmt = $db->prepare("INSERT INTO status_updates (booking_id, status, notes, created_at) VALUES (?, ?, ?, NOW())");
     $stmt->execute([$bookingId, $status, $notes]);
 }
 
@@ -672,6 +670,69 @@ function sendTrackingLinkEmail($bookingId, $customerEmail, $customRFID) {
     } catch(Exception $e) {
         error_log('Tracking email error: ' . $e->getMessage());
         return false;
+    }
+}
+
+function subtractInventoryForServices($db, $serviceNames) {
+    // Define service-to-inventory mappings (same as in services.php)
+    $serviceInventoryMap = [
+        // Basic Services
+        'Bath & Dry' => ['Premium Shampoo'],
+        'Nail Trimming & Grinding' => ['Professional Nail Clippers', 'Nail Grinding File'],
+        'Ear Cleaning & Inspection' => ['Cotton Swabs', 'Ear Cleaning Solution'],
+        'Haircut & Styling' => ['Clipper Machine', 'Professional Shears Set'],
+        'Teeth Cleaning' => ['Dental Cleaning Solution', 'Pet Toothbrush Set'],
+        'De-shedding Treatment' => ['De-shedding Shampoo'],
+
+        // Add-Ons
+        'Extra Nail Polish' => ['Nail Polish - Clear'],
+        'Scented Cologne' => ['Scented Cologne'],
+        'Bow or Bandana' => ['Decorative Bows Set', 'Bandana Set'],
+        'Paw Balm' => ['Paw Balm'],
+        'Whitening Shampoo' => ['Whitening Shampoo'],
+        'Flea & Tick Treatment' => ['Flea & Tick Spray'],
+
+        // Packages (will be checked based on their included services)
+        'Essential Grooming Package' => ['Premium Shampoo', 'Professional Nail Clippers', 'Cotton Swabs', 'Ear Cleaning Solution'],
+        'Full Grooming Package' => ['Premium Shampoo', 'Clipper Machine', 'Professional Shears Set', 'Professional Nail Clippers', 'Cotton Swabs', 'Ear Cleaning Solution', 'Dental Cleaning Solution', 'Pet Toothbrush Set', 'De-shedding Shampoo'],
+        'Bath & Brush Package' => ['Premium Shampoo', 'De-shedding Shampoo'],
+        'Spa Relaxation Package' => ['Premium Shampoo', 'Paw Balm', 'Scented Cologne']
+    ];
+
+    try {
+        // Collect all required inventory items
+        $inventoryToSubtract = [];
+        foreach ($serviceNames as $serviceName) {
+            $requiredItems = $serviceInventoryMap[$serviceName] ?? [];
+
+            foreach ($requiredItems as $itemName) {
+                if (!isset($inventoryToSubtract[$itemName])) {
+                    $inventoryToSubtract[$itemName] = 0;
+                }
+                $inventoryToSubtract[$itemName] += 1; // Subtract 1 unit per service
+            }
+        }
+
+        // Subtract inventory items
+        foreach ($inventoryToSubtract as $itemName => $quantity) {
+            // Check current quantity first
+            $stmt = $db->prepare("SELECT quantity FROM inventory WHERE name = ?");
+            $stmt->execute([$itemName]);
+            $currentItem = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($currentItem && $currentItem['quantity'] >= $quantity) {
+                // Subtract the quantity
+                $stmt = $db->prepare("UPDATE inventory SET quantity = quantity - ? WHERE name = ?");
+                $stmt->execute([$quantity, $itemName]);
+            } else {
+                // Log warning but don't fail the booking - inventory might have been updated
+                error_log("Warning: Insufficient inventory for {$itemName}. Required: {$quantity}, Available: " . ($currentItem['quantity'] ?? 0));
+            }
+        }
+
+    } catch(Exception $e) {
+        // Log error but don't fail the booking
+        error_log("Error subtracting inventory: " . $e->getMessage());
     }
 }
 ?>

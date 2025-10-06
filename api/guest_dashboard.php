@@ -27,7 +27,7 @@ try {
     
     // Get booking data using custom_rfid as token
     $stmt = $db->prepare("
-        SELECT 
+        SELECT
             b.id as booking_id,
             b.status,
             b.total_amount,

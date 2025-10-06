@@ -7,7 +7,7 @@ namespace CuyZ\Valinor\Type\Types;
 use CuyZ\Valinor\Compiler\Native\ComplianceNode;
 use CuyZ\Valinor\Compiler\Node;
 use CuyZ\Valinor\Type\CompositeTraversableType;
-use CuyZ\Valinor\Type\CompositeType;
+use CuyZ\Valinor\Type\DumpableType;
 use CuyZ\Valinor\Type\Type;
 use CuyZ\Valinor\Utility\Polyfill;
 
@@ -16,29 +16,15 @@ use function function_exists;
 use function is_array;
 
 /** @internal */
-final class ListType implements CompositeTraversableType
+final class ListType implements CompositeTraversableType, DumpableType
 {
     private static self $native;
 
-    private string $signature;
+    public function __construct(private Type $subType) {}
 
-    public function __construct(private Type $subType)
-    {
-        $this->signature = "list<{$this->subType->toString()}>";
-    }
-
-    /**
-     * @codeCoverageIgnore
-     * @infection-ignore-all
-     */
     public static function native(): self
     {
-        if (! isset(self::$native)) {
-            self::$native = new self(MixedType::get());
-            self::$native->signature = 'list';
-        }
-
-        return self::$native;
+        return self::$native ??= new self(MixedType::get());
     }
 
     public function accepts(mixed $value): bool
@@ -116,10 +102,6 @@ final class ListType implements CompositeTraversableType
 
     public function traverse(): array
     {
-        if ($this->subType instanceof CompositeType) {
-            return [$this->subType, ...$this->subType->traverse()];
-        }
-
         return [$this->subType];
     }
 
@@ -128,8 +110,19 @@ final class ListType implements CompositeTraversableType
         return ArrayType::native();
     }
 
+    public function dumpParts(): iterable
+    {
+        yield 'list<';
+        yield $this->subType;
+        yield '>';
+    }
+
     public function toString(): string
     {
-        return $this->signature;
+        if ($this === self::native()) {
+            return 'list';
+        }
+
+        return "list<{$this->subType->toString()}>";
     }
 }

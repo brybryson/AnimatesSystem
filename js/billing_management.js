@@ -1,5 +1,5 @@
 // API base URL
-const API_BASE = 'http://localhost/animates/api/';
+const API_BASE = '/animates/api/';
 
 // Sample data for RFID tags and pets (will be replaced with API calls)
 let petData = {
@@ -1446,9 +1446,1410 @@ function saveDraft() {
     alert('Bill draft saved successfully!');
 }
 
-// Generate report
+// Generate comprehensive business report - show modal first
 function generateReport() {
-    alert('Generating billing report... This feature will export today\'s transactions.');
+    // Show the report modal for date selection
+    showReportModal();
+}
+
+// Show report generation modal
+async function showReportModal() {
+    // Reset modal state - both form and preview sections are visible
+    document.getElementById('reportFormSection').classList.remove('hidden');
+    document.getElementById('reportPreviewSection').classList.add('hidden');
+
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('reportStartDate').value = today;
+    document.getElementById('reportEndDate').value = today;
+
+    // Reset form with default values
+    document.getElementById('reportForm').reset();
+    document.getElementById('customDateRange').classList.add('hidden');
+
+    // Set default selections (comprehensive report and today)
+    document.getElementById('reportType').value = 'comprehensive';
+    document.getElementById('reportDateRange').value = 'today';
+
+    // Clear any previous preview data
+    currentReportData = null;
+    currentReportType = null;
+    currentStartDate = null;
+    currentEndDate = null;
+
+    // Show modal
+    document.getElementById('reportModal').classList.remove('hidden');
+
+    // Auto-generate preview for default selections
+    setTimeout(() => {
+        autoGeneratePreview();
+    }, 100);
+}
+
+// Close report modal
+function closeReportModal() {
+    document.getElementById('reportModal').classList.add('hidden');
+}
+
+// Handle date range change
+async function handleDateRangeChange() {
+    const dateRange = document.getElementById('reportDateRange').value;
+    const customRangeDiv = document.getElementById('customDateRange');
+
+    if (dateRange === 'custom') {
+        customRangeDiv.classList.remove('hidden');
+    } else {
+        customRangeDiv.classList.add('hidden');
+        // Auto-generate preview when date range is selected (non-custom)
+        await autoGeneratePreview();
+    }
+}
+
+// Auto-generate preview when date range changes
+async function autoGeneratePreview() {
+    const reportType = document.getElementById('reportType').value;
+    const dateRange = document.getElementById('reportDateRange').value;
+
+    if (!dateRange || dateRange === 'custom') return;
+
+    // Get date range
+    let startDate, endDate;
+    const now = new Date();
+
+    console.log('Date range calculation debug:', {
+        dateRange,
+        now: now.toISOString(),
+        nowMonth: now.getMonth(),
+        nowYear: now.getFullYear()
+    });
+
+    switch (dateRange) {
+        case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+            break;
+        case 'yesterday':
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            startDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+            endDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
+            break;
+        case 'week':
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now);
+            break;
+        case 'last_week':
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - now.getDay() - 7); // Start of last week
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 6); // End of last week
+            endDate.setHours(23, 59, 59, 999);
+            break;
+        case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+            break;
+        case 'last_month':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+            console.log('Last month calculation:', {
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+                startFormatted: startDate.toLocaleDateString(),
+                endFormatted: endDate.toLocaleDateString()
+            });
+            break;
+    }
+
+    // Store current report parameters
+    currentReportType = reportType;
+    currentStartDate = startDate;
+    currentEndDate = endDate;
+
+    // Show loading and generate preview
+    showNotification('Generating preview...', 'info');
+    await generateReportPreview(reportType, startDate, endDate);
+}
+
+// Global variables to store report data
+let currentReportData = null;
+let currentReportType = null;
+let currentStartDate = null;
+let currentEndDate = null;
+
+// Handle report form submission - for custom date ranges
+async function handleReportSubmission(event) {
+    event.preventDefault();
+
+    const reportType = document.getElementById('reportType').value;
+    const dateRange = document.getElementById('reportDateRange').value;
+
+    // Only handle custom date ranges here, others are auto-generated
+    if (dateRange !== 'custom') {
+        return; // Preview already generated by date range change
+    }
+
+    // Handle custom date range
+    const startDate = new Date(document.getElementById('reportStartDate').value);
+    const endDate = new Date(document.getElementById('reportEndDate').value);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (!startDate || !endDate || startDate > endDate) {
+        showNotification('Please select valid start and end dates', 'error');
+        return;
+    }
+
+    // Store current report parameters
+    currentReportType = reportType;
+    currentStartDate = startDate;
+    currentEndDate = endDate;
+
+    // Show loading and generate preview
+    showNotification('Generating preview...', 'info');
+    await generateReportPreview(reportType, startDate, endDate);
+}
+
+// Generate report preview
+async function generateReportPreview(reportType, startDate, endDate) {
+    try {
+        // Fetch transactions and pending bills from separate endpoints
+        const [transactionsResponse, pendingBillsResponse] = await Promise.all([
+            fetch(`${API_BASE}billing.php?action=get_transactions`),
+            fetch(`${API_BASE}billing.php?action=get_pending_bills`)
+        ]);
+
+        const transactionsData = await transactionsResponse.json();
+        const pendingBillsData = await pendingBillsResponse.json();
+
+        if (!transactionsData.success || !pendingBillsData.success) {
+            throw new Error('Failed to fetch report data');
+        }
+
+        let allTransactions = transactionsData.transactions || [];
+        let allPendingBills = pendingBillsData.pending_bills || [];
+
+        // Filter data by date range
+        const filteredTransactions = allTransactions.filter(t => {
+            const transactionDate = new Date(t.created_at);
+            return transactionDate >= startDate && transactionDate <= endDate;
+        });
+
+        const filteredPendingBills = allPendingBills.filter(b => {
+            const checkinDate = new Date(b.check_in_time);
+            return checkinDate >= startDate && checkinDate <= endDate;
+        });
+
+        // Debug logging
+        console.log('Report filtering debug:', {
+            reportType,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            totalTransactions: allTransactions.length,
+            filteredTransactions: filteredTransactions.length,
+            totalPendingBills: allPendingBills.length,
+            filteredPendingBills: filteredPendingBills.length,
+            sampleTransaction: filteredTransactions[0] ? {
+                id: filteredTransactions[0].id,
+                created_at: filteredTransactions[0].created_at,
+                status: filteredTransactions[0].status
+            } : null
+        });
+
+        // Store data for download
+        currentReportData = {
+            transactions: filteredTransactions,
+            pendingBills: filteredPendingBills,
+            startDate,
+            endDate
+        };
+
+        // Display preview
+        displayReportPreview(reportType, filteredTransactions, filteredPendingBills, startDate, endDate);
+
+        // Show preview section (form stays visible)
+        document.getElementById('reportPreviewSection').classList.remove('hidden');
+
+    } catch (error) {
+        console.error('Error generating report preview:', error);
+        showNotification('Failed to generate report preview', 'error');
+    }
+}
+
+// Display report preview in table - matches CSV exactly
+function displayReportPreview(reportType, transactions, pendingBills, startDate, endDate) {
+    // Update summary info
+    document.getElementById('previewReportType').textContent = getReportTypeDisplayName(reportType);
+
+    // Format dates properly for display
+    const startFormatted = startDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    const endFormatted = endDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    document.getElementById('previewDateRange').textContent = `${startFormatted} to ${endFormatted}`;
+    document.getElementById('previewGeneratedTime').textContent = new Date().toLocaleString();
+
+    const totalRecords = reportType === 'summary' ? 'Summary' : `${transactions.length + (reportType === 'comprehensive' ? pendingBills.length : 0)} records`;
+    document.getElementById('previewTotalRecords').textContent = totalRecords;
+
+    // Clear previous content
+    const headerEl = document.getElementById('previewTableHeader');
+    const bodyEl = document.getElementById('previewTableBody');
+    headerEl.innerHTML = '';
+    bodyEl.innerHTML = '';
+
+    if (reportType === 'summary') {
+        // Summary report preview - matches CSV structure
+        const completedTransactions = transactions.filter(t => t.status === 'completed');
+        const voidedTransactions = transactions.filter(t => t.status === 'voided');
+        const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+        const pendingRevenue = pendingBills.reduce((sum, b) => sum + parseFloat(b.total_amount || 0), 0);
+
+        headerEl.innerHTML = `
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Metric</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Value</th>
+        `;
+
+        bodyEl.innerHTML = `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm text-gray-900">Total Transactions</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${transactions.length}</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm text-gray-900">Completed Transactions</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${completedTransactions.length}</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm text-gray-900">Voided Transactions</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${voidedTransactions.length}</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm text-gray-900">Total Revenue</td>
+                <td class="px-4 py-2 text-sm text-gray-900">₱${totalRevenue.toFixed(2)}</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm text-gray-900">Pending Bills</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${pendingBills.length}</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm text-gray-900">Pending Revenue</td>
+                <td class="px-4 py-2 text-sm text-gray-900">₱${pendingRevenue.toFixed(2)}</td>
+            </tr>
+        `;
+
+    } else if (reportType === 'transactions') {
+        // Transaction details preview - matches CSV headers exactly
+        headerEl.innerHTML = `
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Date/Time</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Transaction Reference</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Customer Name</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Pet Name</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Pet Breed</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">RFID Tag</th>
+            <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Amount</th>
+            <th class="px-4 py-2 text-center text-xs font-medium text-gray-600">Payment Method</th>
+            <th class="px-4 py-2 text-center text-xs font-medium text-gray-600">Payment Platform</th>
+            <th class="px-4 py-2 text-center text-xs font-medium text-gray-600">Status</th>
+        `;
+
+        const previewTransactions = transactions.slice(0, 5); // Show first 5 to match CSV preview
+        bodyEl.innerHTML = previewTransactions.map(t => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm text-gray-900">${new Date(t.created_at).toLocaleString()}</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${t.transaction_reference || ''}</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${t.customer_name || 'Unknown Customer'}</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${t.pet_name || 'Unknown Pet'}</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${t.pet_breed || 'Unknown Breed'}</td>
+                <td class="px-4 py-2 text-sm text-gray-900">${t.rfid_tag || ''}</td>
+                <td class="px-4 py-2 text-sm text-gray-900 text-right">${t.amount || 0}</td>
+                <td class="px-4 py-2 text-sm text-center text-gray-900">${t.payment_method || ''}</td>
+                <td class="px-4 py-2 text-sm text-center text-gray-900">${t.payment_platform || ''}</td>
+                <td class="px-4 py-2 text-sm text-center">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${t.status === 'completed' ? 'bg-green-100 text-green-800' : t.status === 'voided' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">
+                        ${t.status || 'N/A'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+
+        if (transactions.length > 5) {
+            bodyEl.innerHTML += `
+                <tr class="hover:bg-gray-50">
+                    <td colspan="10" class="px-4 py-2 text-sm text-gray-500 text-center italic">
+                        ... and ${transactions.length - 5} more transactions (will be included in CSV)
+                    </td>
+                </tr>
+            `;
+        }
+
+    } else {
+        // Comprehensive report preview - matches CSV structure
+        headerEl.innerHTML = `
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Section</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-600">Preview</th>
+            <th class="px-4 py-2 text-right text-xs font-medium text-gray-600">Records</th>
+        `;
+
+        const completedTransactions = transactions.filter(t => t.status === 'completed');
+        const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+        bodyEl.innerHTML = `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm font-medium text-gray-900">SUMMARY STATISTICS</td>
+                <td class="px-4 py-2 text-sm text-gray-900">Revenue: ₱${totalRevenue.toFixed(2)}, Transactions: ${transactions.length}</td>
+                <td class="px-4 py-2 text-sm text-gray-900 text-right">Summary</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm font-medium text-gray-900">PAYMENT METHODS BREAKDOWN</td>
+                <td class="px-4 py-2 text-sm text-gray-900">Cash, Online, etc. with percentages</td>
+                <td class="px-4 py-2 text-sm text-gray-900 text-right">Analytics</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm font-medium text-gray-900">SERVICE POPULARITY</td>
+                <td class="px-4 py-2 text-sm text-gray-900">Top requested services</td>
+                <td class="px-4 py-2 text-sm text-gray-900 text-right">${pendingBills.length > 0 ? 'Analysis' : 'N/A'}</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm font-medium text-gray-900">DETAILED TRANSACTIONS</td>
+                <td class="px-4 py-2 text-sm text-gray-900">All transaction records with full details</td>
+                <td class="px-4 py-2 text-sm text-gray-900 text-right">${transactions.length}</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm font-medium text-gray-900">PENDING BILLS</td>
+                <td class="px-4 py-2 text-sm text-gray-900">Outstanding bookings and services</td>
+                <td class="px-4 py-2 text-sm text-gray-900 text-right">${pendingBills.length}</td>
+            </tr>
+        `;
+    }
+}
+
+// Get display name for report type
+function getReportTypeDisplayName(reportType) {
+    switch (reportType) {
+        case 'comprehensive': return 'Comprehensive Business Report';
+        case 'transactions': return 'Transaction Details Only';
+        case 'summary': return 'Summary Report Only';
+        default: return reportType;
+    }
+}
+
+// Go back to form
+function backToForm() {
+    document.getElementById('reportPreviewSection').classList.add('hidden');
+    document.getElementById('reportFormSection').classList.remove('hidden');
+}
+
+// Download the report
+function downloadReport() {
+    if (!currentReportData) {
+        showNotification('No report data available', 'error');
+        return;
+    }
+
+    const { transactions, pendingBills, startDate, endDate } = currentReportData;
+
+    // Generate Excel workbook based on report type
+    let workbook;
+    if (currentReportType === 'summary') {
+        workbook = generateSummaryReportExcel(transactions, pendingBills, startDate, endDate);
+    } else if (currentReportType === 'transactions') {
+        workbook = generateTransactionReportExcel(transactions, startDate, endDate);
+    } else {
+        workbook = generateComprehensiveReportExcel(transactions, pendingBills, startDate, endDate);
+    }
+
+    // Download the Excel file
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+    const dateRangeStr = startStr === endStr ? startStr : `${startStr}_to_${endStr}`;
+
+    XLSX.writeFile(workbook, `${currentReportType}_report_${dateRangeStr}.xlsx`);
+
+    // Close modal and show success
+    closeReportModal();
+    showNotification('Report downloaded successfully!', 'success');
+}
+
+// Generate report with specific date range
+async function generateReportWithDateRange(reportType, startDate, endDate) {
+    try {
+        showNotification('Generating business report...', 'info');
+
+        // Format dates for filename
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
+        const dateRangeStr = startStr === endStr ? startStr : `${startStr}_to_${endStr}`;
+
+        // Fetch transactions and pending bills from separate endpoints
+        const [transactionsResponse, pendingBillsResponse] = await Promise.all([
+            fetch(`${API_BASE}billing.php?action=get_transactions`),
+            fetch(`${API_BASE}billing.php?action=get_pending_bills`)
+        ]);
+
+        const transactionsData = await transactionsResponse.json();
+        const pendingBillsData = await pendingBillsResponse.json();
+
+        if (!transactionsData.success || !pendingBillsData.success) {
+            throw new Error('Failed to fetch report data');
+        }
+
+        let allTransactions = transactionsData.transactions || [];
+        let allPendingBills = pendingBillsData.pending_bills || [];
+
+        // Filter data by date range
+        const filteredTransactions = allTransactions.filter(t => {
+            const transactionDate = new Date(t.created_at);
+            return transactionDate >= startDate && transactionDate <= endDate;
+        });
+
+        const filteredPendingBills = allPendingBills.filter(b => {
+            const checkinDate = new Date(b.check_in_time);
+            return checkinDate >= startDate && checkinDate <= endDate;
+        });
+
+        // Generate CSV content based on report type (Excel-compatible format)
+        let csvContent;
+        if (reportType === 'summary') {
+            csvContent = generateSummaryReportCSV(filteredTransactions, filteredPendingBills, startDate, endDate);
+        } else if (reportType === 'transactions') {
+            csvContent = generateTransactionReportCSV(filteredTransactions, startDate, endDate);
+        } else {
+            csvContent = generateComprehensiveReportCSV(filteredTransactions, filteredPendingBills, startDate, endDate);
+        }
+
+        // Download the CSV file (Excel will open it properly)
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${reportType}_report_${dateRangeStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showNotification('Business report generated successfully!', 'success');
+
+    } catch (error) {
+        console.error('Error generating report:', error);
+        showNotification('Failed to generate business report', 'error');
+    }
+}
+
+function buildSummarySheetData(title, transactions, pendingBills, startDate, endDate) {
+    const isValidDate = (date) => date instanceof Date && !isNaN(date.getTime());
+    const formatDateRange = (start, end) => {
+        if (!isValidDate(start) || !isValidDate(end)) {
+            return 'N/A';
+        }
+        const startStr = start.toLocaleDateString();
+        const endStr = end.toLocaleDateString();
+        return startStr === endStr ? startStr : `${startStr} to ${endStr}`;
+    };
+    const toAmount = (value) => {
+        const num = parseFloat(value);
+        return isNaN(num) ? 0 : num;
+    };
+    const formatCurrency = (amount) => `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const generatedOn = new Date().toLocaleString();
+    const completedTransactions = transactions.filter(t => (t.status || '').toLowerCase() === 'completed');
+    const voidedTransactions = transactions.filter(t => (t.status || '').toLowerCase() === 'voided');
+    const totalTransactions = transactions.length;
+    const totalRevenue = completedTransactions.reduce((sum, t) => sum + toAmount(t.amount), 0);
+    const pendingRevenue = pendingBills.reduce((sum, b) => sum + toAmount(b.total_amount), 0);
+
+    // Get current user name for the report
+    const getCurrentUserName = () => {
+        if (!currentUser) return 'Unknown User';
+        const preferredName = (currentUser.full_name && currentUser.full_name.trim())
+            ? currentUser.full_name.trim()
+            : ((currentUser.username && currentUser.username.trim())
+                ? currentUser.username.trim()
+                : (currentUser.email ? currentUser.email.split('@')[0] : 'User'));
+        return preferredName;
+    };
+
+    const summaryData = [
+        [title, '', ''],
+        ['Report Period', formatDateRange(startDate, endDate), ''],
+        ['Generated on', generatedOn, ''],
+        ['Generated by', getCurrentUserName(), ''],
+        ['', '', ''],
+        ['Summary Statistics', '', ''],
+        ['Metric', 'Value', ''],
+        ['Total Transactions', totalTransactions.toString(), ''],
+        ['Completed Transactions', completedTransactions.length.toString(), ''],
+        ['Voided Transactions', voidedTransactions.length.toString(), ''],
+        ['Total Revenue', formatCurrency(totalRevenue), ''],
+        ['Pending Bills', pendingBills.length.toString(), ''],
+        ['Pending Revenue', formatCurrency(pendingRevenue), ''],
+        ['', '', ''],
+        ['Payment Methods Breakdown', '', ''],
+        ['Method', 'Amount', 'Percentage']
+    ];
+
+    const paymentBreakdown = {};
+    completedTransactions.forEach(t => {
+        const method = t.payment_method ? t.payment_method.toString() : 'Unknown';
+        paymentBreakdown[method] = (paymentBreakdown[method] || 0) + toAmount(t.amount);
+    });
+
+    if (Object.keys(paymentBreakdown).length === 0) {
+        summaryData.push(['No completed transactions recorded', '', '']);
+    } else {
+        Object.entries(paymentBreakdown).forEach(([method, amount]) => {
+            const percentage = totalRevenue > 0 ? `${((amount / totalRevenue) * 100).toFixed(1)}%` : '0.0%';
+            summaryData.push([method, formatCurrency(amount), percentage]);
+        });
+    }
+
+    summaryData.push(['', '', '']);
+    summaryData.push(['Service Popularity', '', '']);
+    summaryData.push(['Service', 'Bookings', '']);
+
+    const serviceCount = {};
+    const recordService = (name) => {
+        if (!name) return;
+        const cleaned = name.trim();
+        if (!cleaned) return;
+        serviceCount[cleaned] = (serviceCount[cleaned] || 0) + 1;
+    };
+
+    pendingBills.forEach(bill => {
+        if (!bill || !bill.services) {
+            return;
+        }
+        if (Array.isArray(bill.services)) {
+            bill.services.forEach(service => {
+                if (typeof service === 'string') {
+                    recordService(service.split(' - ₱')[0]);
+                } else if (service && service.name) {
+                    recordService(service.name);
+                }
+            });
+        } else if (typeof bill.services === 'string') {
+            bill.services.split(';').forEach(serviceEntry => {
+                recordService(serviceEntry.split(' - ₱')[0]);
+            });
+        }
+    });
+
+    const popularServices = Object.entries(serviceCount)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 20);
+
+    if (popularServices.length === 0) {
+        summaryData.push(['No service data available', '', '']);
+    } else {
+        popularServices.forEach(([serviceName, count]) => {
+            summaryData.push([serviceName, count.toString(), '']);
+        });
+    }
+
+    return summaryData;
+}
+
+function autoFitColumns(worksheet, data) {
+    if (!worksheet || !data) {
+        return;
+    }
+
+    const colWidths = [];
+    
+    // First pass: calculate based on content
+    data.forEach(row => {
+        if (!Array.isArray(row)) {
+            return;
+        }
+        row.forEach((value, idx) => {
+            const cellValue = value == null ? '' : value.toString();
+            const width = cellValue.length + 4; // Add more padding for better readability
+            colWidths[idx] = Math.max(colWidths[idx] || 8, width);
+        });
+    });
+
+    // Second pass: ensure minimum widths for headers and common content
+    if (data.length > 0 && Array.isArray(data[0])) {
+        data[0].forEach((header, idx) => {
+            if (header) {
+                const headerWidth = header.toString().length + 4;
+                colWidths[idx] = Math.max(colWidths[idx] || 8, headerWidth);
+            }
+        });
+    }
+
+    worksheet['!cols'] = colWidths.map((width, idx) => {
+        // Calculate minimum width based on header length or content
+        const minWidth = Math.max(width, 15); // Minimum 15 characters for better spacing
+        const maxWidth = Math.min(minWidth, 100); // Maximum 100 characters for very long content
+        return { wch: maxWidth };
+    });
+}
+
+// Format summary sheet with borders and styling
+function formatSummarySheet(worksheet, data) {
+    if (!worksheet || !data) return;
+    
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    // Apply formatting to each cell
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!worksheet[cellAddress]) {
+                // Create empty cell if it doesn't exist
+                worksheet[cellAddress] = { t: 's', v: '' };
+            }
+            
+            const cell = worksheet[cellAddress];
+            const cellValue = cell.v;
+            
+            // Initialize cell style
+            let cellStyle = {
+                border: {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                },
+                alignment: { vertical: 'center' }
+            };
+            
+            // Title row (row 0)
+            if (R === 0) {
+                cellStyle = {
+                    font: { bold: true, size: 16, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '1F4E79' } },
+                    alignment: { horizontal: 'center', vertical: 'center' },
+                    border: {
+                        top: { style: 'thick' },
+                        bottom: { style: 'thick' },
+                        left: { style: 'thick' },
+                        right: { style: 'thick' }
+                    }
+                };
+            }
+            // Header rows (Report Period, Generated on)
+            else if (R === 1 || R === 2) {
+                if (C === 0) {
+                    cellStyle = {
+                        font: { bold: true, size: 12 },
+                        fill: { fgColor: { rgb: 'D9E2F3' } },
+                        alignment: { vertical: 'center' },
+                        border: {
+                            top: { style: 'thin' },
+                            bottom: { style: 'thin' },
+                            left: { style: 'thin' },
+                            right: { style: 'thin' }
+                        }
+                    };
+                }
+            }
+            // Section headers (Summary Statistics, Payment Methods, Service Popularity)
+            else if (cellValue && (cellValue.toString().includes('Summary Statistics') || 
+                     cellValue.toString().includes('Payment Methods Breakdown') || 
+                     cellValue.toString().includes('Service Popularity'))) {
+                cellStyle = {
+                    font: { bold: true, size: 14, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '4472C4' } },
+                    alignment: { horizontal: 'center', vertical: 'center' },
+                    border: {
+                        top: { style: 'thick' },
+                        bottom: { style: 'thick' },
+                        left: { style: 'thick' },
+                        right: { style: 'thick' }
+                    }
+                };
+            }
+            // Column headers (Metric/Value, Method/Amount/Percentage, Service/Bookings)
+            else if (cellValue && (cellValue === 'Metric' || cellValue === 'Value' || 
+                     cellValue === 'Method' || cellValue === 'Amount' || cellValue === 'Percentage' ||
+                     cellValue === 'Service' || cellValue === 'Bookings')) {
+                cellStyle = {
+                    font: { bold: true, size: 11 },
+                    fill: { fgColor: { rgb: 'B4C6E7' } },
+                    alignment: { horizontal: 'center', vertical: 'center' },
+                    border: {
+                        top: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    }
+                };
+            }
+            // Data rows with values
+            else if (cellValue && cellValue.toString().trim() !== '') {
+                cellStyle.alignment = { vertical: 'center' };
+                
+                // Right-align numbers and currency
+                if (cellValue.toString().includes('₱') || (!isNaN(cellValue) && cellValue !== '')) {
+                    cellStyle.alignment.horizontal = 'right';
+                }
+                
+                // Alternate row colors for better readability
+                if (R % 2 === 0 && R > 3) {
+                    cellStyle.fill = { fgColor: { rgb: 'F8F9FA' } };
+                }
+            }
+            
+            cell.s = cellStyle;
+        }
+    }
+    
+    // Merge title cell across all columns
+    if (range.e.c > 0) {
+        worksheet['!merges'] = worksheet['!merges'] || [];
+        worksheet['!merges'].push({
+            s: { r: 0, c: 0 },
+            e: { r: 0, c: range.e.c }
+        });
+    }
+
+    // Freeze header row (the actual data header at row 5)
+    worksheet['!freeze'] = { xSplit: 0, ySplit: 6 };
+
+    // Add filters to the actual header row (row 5)
+    worksheet['!autofilter'] = { ref: XLSX.utils.encode_range({c: range.s.c, r: 5}, {c: range.e.c, r: 5}) };
+}
+
+// New formatting function with better compatibility
+function formatSummarySheetNew(worksheet, data) {
+    if (!worksheet || !data) return;
+    
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    // Create styles array for the workbook
+    if (!worksheet['!cols']) worksheet['!cols'] = [];
+    if (!worksheet['!rows']) worksheet['!rows'] = [];
+    
+    // Apply formatting to each cell
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            
+            if (!worksheet[cellAddress]) {
+                worksheet[cellAddress] = { t: 's', v: '' };
+            }
+            
+            const cell = worksheet[cellAddress];
+            const cellValue = cell.v;
+            
+            // Title row (row 0) - Dark blue background, white bold text
+            if (R === 0) {
+                cell.s = {
+                    font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "1F4E79" } },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thick", color: { rgb: "000000" } },
+                        bottom: { style: "thick", color: { rgb: "000000" } },
+                        left: { style: "thick", color: { rgb: "000000" } },
+                        right: { style: "thick", color: { rgb: "000000" } }
+                    }
+                };
+            }
+            // Header rows (Report Period, Generated on)
+            else if (R === 1 || R === 2) {
+                if (C === 0) {
+                    cell.s = {
+                        font: { bold: true, sz: 12 },
+                        fill: { fgColor: { rgb: "D9E2F3" } },
+                        alignment: { vertical: "center" },
+                        border: {
+                            top: { style: "thin", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                } else {
+                    cell.s = {
+                        border: {
+                            top: { style: "thin", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                }
+            }
+            // Section headers (Summary Statistics, Payment Methods, Service Popularity)
+            else if (cellValue && (cellValue.toString().includes('Summary Statistics') || 
+                     cellValue.toString().includes('Payment Methods Breakdown') || 
+                     cellValue.toString().includes('Service Popularity'))) {
+                cell.s = {
+                    font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "4472C4" } },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thick", color: { rgb: "000000" } },
+                        bottom: { style: "thick", color: { rgb: "000000" } },
+                        left: { style: "thick", color: { rgb: "000000" } },
+                        right: { style: "thick", color: { rgb: "000000" } }
+                    }
+                };
+            }
+            // Column headers (Metric/Value, Method/Amount/Percentage, Service/Bookings)
+            else if (cellValue && (cellValue === 'Metric' || cellValue === 'Value' || 
+                     cellValue === 'Method' || cellValue === 'Amount' || cellValue === 'Percentage' ||
+                     cellValue === 'Service' || cellValue === 'Bookings')) {
+                cell.s = {
+                    font: { bold: true, sz: 11 },
+                    fill: { fgColor: { rgb: "B4C6E7" } },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+            // Data rows with values
+            else if (cellValue && cellValue.toString().trim() !== '') {
+                let alignment = { vertical: "center" };
+                
+                // Right-align numbers and currency
+                if (cellValue.toString().includes('₱') || (!isNaN(cellValue) && cellValue !== '')) {
+                    alignment.horizontal = "right";
+                }
+                
+                cell.s = {
+                    alignment: alignment,
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+                
+                // Alternate row colors for better readability
+                if (R % 2 === 0 && R > 3) {
+                    cell.s.fill = { fgColor: { rgb: "F8F9FA" } };
+                }
+            }
+            // Empty cells still get borders
+            else {
+                cell.s = {
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+        }
+    }
+    
+    // Merge title cell across all columns
+    if (range.e.c > 0) {
+        worksheet['!merges'] = worksheet['!merges'] || [];
+        worksheet['!merges'].push({
+            s: { r: 0, c: 0 },
+            e: { r: 0, c: range.e.c }
+        });
+    }
+}
+
+// New data sheet formatting function
+function formatDataSheetNew(worksheet, data, sheetName) {
+    if (!worksheet || !data) return;
+    
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    // Apply formatting to each cell
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!worksheet[cellAddress]) continue;
+            
+            const cell = worksheet[cellAddress];
+            const cellValue = cell.v;
+            if (cellValue == null) continue;
+            
+            // Title row (row 0) - special formatting for report title
+            if (R === 0) {
+                cell.s = {
+                    font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "1F4E79" } },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thick", color: { rgb: "000000" } },
+                        bottom: { style: "thick", color: { rgb: "000000" } },
+                        left: { style: "thick", color: { rgb: "000000" } },
+                        right: { style: "thick", color: { rgb: "000000" } }
+                    }
+                };
+            }
+            // Header info rows (rows 1-3: Report Period, Generated on, Generated by)
+            else if (R >= 1 && R <= 3) {
+                if (C === 0) {
+                    cell.s = {
+                        font: { bold: true, sz: 12 },
+                        fill: { fgColor: { rgb: "D9E2F3" } },
+                        alignment: { vertical: "center" },
+                        border: {
+                            top: { style: "thin", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                } else {
+                    cell.s = {
+                        border: {
+                            top: { style: "thin", color: { rgb: "000000" } },
+                            bottom: { style: "thin", color: { rgb: "000000" } },
+                            left: { style: "thin", color: { rgb: "000000" } },
+                            right: { style: "thin", color: { rgb: "000000" } }
+                        }
+                    };
+                }
+            }
+            // Empty row (row 4)
+            else if (R === 4) {
+                cell.s = {
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+            // Actual header row (row 5)
+            else if (R === 5) {
+                cell.s = {
+                    font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "4472C4" } },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+            }
+            // Data rows (starting from row 6)
+            else {
+                let alignment = { vertical: "center" };
+
+                // Right-align numbers and currency
+                if (cellValue.toString().includes('₱') || (!isNaN(cellValue) && cellValue !== '')) {
+                    alignment.horizontal = "right";
+                }
+
+                cell.s = {
+                    alignment: alignment,
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
+                };
+
+                // Alternate row colors for better readability (starting from data rows)
+                if ((R - 5) % 2 === 0) { // Adjust for the 6 header rows
+                    cell.s.fill = { fgColor: { rgb: "F8F9FA" } };
+                }
+            }
+        }
+    }
+}
+
+// Generate comprehensive Excel report
+function generateComprehensiveReportExcel(transactions, pendingBills, startDate, endDate) {
+    const workbook = XLSX.utils.book_new();
+    workbook.Props = {
+        Title: 'Animates PH Business Report',
+        Author: 'Animates PH System',
+        CreatedDate: new Date()
+    };
+    workbook.Workbook = {
+        Views: [{ RTL: false }]
+    };
+
+    // Get current user name for the report
+    const getCurrentUserName = () => {
+        if (!currentUser) return 'Unknown User';
+        const preferredName = (currentUser.full_name && currentUser.full_name.trim())
+            ? currentUser.full_name.trim()
+            : ((currentUser.username && currentUser.username.trim())
+                ? currentUser.username.trim()
+                : (currentUser.email ? currentUser.email.split('@')[0] : 'User'));
+        return preferredName;
+    };
+
+    const summaryData = buildSummarySheetData('ANIMATES PH - COMPREHENSIVE BUSINESS REPORT', transactions, pendingBills, startDate, endDate);
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    
+    // Apply formatting to summary sheet
+    formatSummarySheetNew(summarySheet, summaryData);
+    autoFitColumns(summarySheet, summaryData);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+    // Transactions Sheet with header information
+    const transactionHeaders = ['Date/Time', 'Transaction Reference', 'Customer Name', 'Pet Name', 'Pet Breed', 'RFID Tag', 'Amount', 'Payment Method', 'Payment Platform', 'Status'];
+    const transactionData = [
+        ['ANIMATES PH - TRANSACTION DETAILS', '', '', '', '', '', '', '', '', ''],
+        ['Report Period', `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`, '', '', '', '', '', '', '', ''],
+        ['Generated on', new Date().toLocaleString(), '', '', '', '', '', '', '', ''],
+        ['Generated by', getCurrentUserName(), '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', '', ''],
+        transactionHeaders
+    ];
+
+    transactions.forEach(transaction => {
+        const amount = parseFloat(transaction.amount || 0);
+        const amountStr = isNaN(amount) ? '₱0.00' : `₱${amount.toFixed(2)}`;
+        transactionData.push([
+            new Date(transaction.created_at).toLocaleString(),
+            transaction.transaction_reference || '',
+            transaction.customer_name || '',
+            transaction.pet_name || '',
+            transaction.pet_breed || '',
+            transaction.rfid_tag || '',
+            amountStr,
+            transaction.payment_method || '',
+            transaction.payment_platform || '',
+            transaction.status || ''
+        ]);
+    });
+
+    const transactionSheet = XLSX.utils.aoa_to_sheet(transactionData);
+    formatDataSheetNew(transactionSheet, transactionData, 'Transactions');
+    autoFitColumns(transactionSheet, transactionData);
+    XLSX.utils.book_append_sheet(workbook, transactionSheet, 'Transactions');
+
+    // Pending Bills Sheet with header information
+    const pendingHeaders = ['RFID Tag', 'Customer Name', 'Pet Name', 'Pet Breed', 'Total Amount', 'Check-in Time', 'Status', 'Services'];
+    const pendingData = [
+        ['ANIMATES PH - PENDING BILLS', '', '', '', '', '', '', ''],
+        ['Report Period', `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`, '', '', '', '', '', ''],
+        ['Generated on', new Date().toLocaleString(), '', '', '', '', '', ''],
+        ['Generated by', getCurrentUserName(), '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        pendingHeaders
+    ];
+
+    pendingBills.forEach(bill => {
+        let parsedServices = '';
+        if (bill.services) {
+            if (Array.isArray(bill.services)) {
+                const serviceNames = bill.services
+                    .map(service => {
+                        if (typeof service === 'string') {
+                            return service.split(' - ₱')[0].trim();
+                        }
+                        return service && service.name ? service.name : '';
+                    })
+                    .filter(name => name);
+                parsedServices = serviceNames.join(', ');
+            } else {
+                const services = bill.services.split('; ');
+                const cleanServices = services
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0)
+                    .map(s => s.split(' - ₱')[0].trim())
+                    .filter(s => s.length > 0);
+                parsedServices = cleanServices.join(', ');
+            }
+        }
+
+        const amount = parseFloat(bill.total_amount || 0);
+        const amountStr = isNaN(amount) ? '₱0.00' : `₱${amount.toFixed(2)}`;
+
+        pendingData.push([
+            bill.custom_rfid || '',
+            bill.customer_name || '',
+            bill.pet_name || '',
+            bill.pet_breed || '',
+            amountStr,
+            new Date(bill.check_in_time).toLocaleString(),
+            bill.status || '',
+            parsedServices
+        ]);
+    });
+
+    const pendingSheet = XLSX.utils.aoa_to_sheet(pendingData);
+    formatDataSheetNew(pendingSheet, pendingData, 'Pending Bills');
+    autoFitColumns(pendingSheet, pendingData);
+    XLSX.utils.book_append_sheet(workbook, pendingSheet, 'Pending Bills');
+    return workbook;
+}
+
+// Generate comprehensive Excel-compatible CSV report (Tab-separated for better Excel formatting)
+function generateComprehensiveReportCSV(transactions, pendingBills, startDate, endDate) {
+    const lines = [];
+
+    // Excel formatting hint - tells Excel to use tab separation
+    lines.push('sep=\t');
+
+    // Get current user name for the report
+    const getCurrentUserName = () => {
+        if (!currentUser) return 'Unknown User';
+        const preferredName = (currentUser.full_name && currentUser.full_name.trim())
+            ? currentUser.full_name.trim()
+            : ((currentUser.username && currentUser.username.trim())
+                ? currentUser.username.trim()
+                : (currentUser.email ? currentUser.email.split('@')[0] : 'User'));
+        return preferredName;
+    };
+
+    // Report Header with proper spacing
+    lines.push('ANIMATES PH - COMPREHENSIVE BUSINESS REPORT\t\t\t\t\t\t\t\t\t\t');
+    lines.push(`Report Period:\t${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}\t\t\t\t\t\t\t\t`);
+    lines.push(`Generated on:\t${new Date().toLocaleString()}\t\t\t\t\t\t\t\t`);
+    lines.push(`Generated by:\t${getCurrentUserName()}\t\t\t\t\t\t\t\t`);
+    lines.push('');
+
+    // Summary Statistics Section
+    lines.push('SUMMARY STATISTICS\t\t\t\t\t\t\t\t\t\t');
+    lines.push('==================\t\t\t\t\t\t\t\t\t\t');
+
+    const totalTransactions = transactions.length;
+    const completedTransactions = transactions.filter(t => t.status === 'completed');
+    const voidedTransactions = transactions.filter(t => t.status === 'voided');
+    const totalRevenue = completedTransactions.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+    const pendingRevenue = pendingBills.reduce((sum, b) => sum + parseFloat(b.total_amount || 0), 0);
+
+    lines.push(`Total Transactions\t${totalTransactions}\t\t\t\t\t\t\t\t\t`);
+    lines.push(`Completed Transactions\t${completedTransactions.length}\t\t\t\t\t\t\t\t\t`);
+    lines.push(`Voided Transactions\t${voidedTransactions.length}\t\t\t\t\t\t\t\t\t`);
+    lines.push(`Total Revenue\t₱${totalRevenue.toFixed(2)}\t\t\t\t\t\t\t\t\t`);
+    lines.push(`Pending Bills\t${pendingBills.length}\t\t\t\t\t\t\t\t\t`);
+    lines.push(`Pending Revenue\t₱${pendingRevenue.toFixed(2)}\t\t\t\t\t\t\t\t\t`);
+    lines.push('');
+
+    // Payment Methods Breakdown
+    lines.push('PAYMENT METHODS BREAKDOWN\t\t\t\t\t\t\t\t\t\t');
+    lines.push('========================\t\t\t\t\t\t\t\t\t\t');
+    lines.push('Method\tAmount\tPercentage\t\t\t\t\t\t\t\t');
+
+    const paymentMethods = {};
+    completedTransactions.forEach(t => {
+        const method = t.payment_method || 'unknown';
+        paymentMethods[method] = (paymentMethods[method] || 0) + parseFloat(t.amount || 0);
+    });
+
+    Object.entries(paymentMethods).forEach(([method, amount]) => {
+        const percentage = totalRevenue > 0 ? ((amount / totalRevenue) * 100).toFixed(1) : '0.0';
+        lines.push(`${method}\t₱${amount.toFixed(2)}\t${percentage}%\t\t\t\t\t\t\t\t`);
+    });
+    lines.push('');
+
+    // Service Popularity (if available)
+    if (pendingBills.length > 0) {
+        lines.push('SERVICE POPULARITY\t\t\t\t\t\t\t\t\t\t');
+        lines.push('==================\t\t\t\t\t\t\t\t\t\t');
+        lines.push('Service\tBookings\t\t\t\t\t\t\t\t\t');
+
+        const serviceCount = {};
+        pendingBills.forEach(bill => {
+            if (bill.services) {
+                const services = bill.services.split('; ');
+                services.forEach(service => {
+                    if (service.trim()) {
+                        const serviceName = service.split(' - ₱')[0].trim();
+                        serviceCount[serviceName] = (serviceCount[serviceName] || 0) + 1;
+                    }
+                });
+            }
+        });
+
+        Object.entries(serviceCount)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 10)
+            .forEach(([service, count]) => {
+                lines.push(`${service}\t${count}\t\t\t\t\t\t\t\t\t`);
+            });
+        lines.push('');
+    }
+
+    // Detailed Transactions Section
+    lines.push('DETAILED TRANSACTIONS\t\t\t\t\t\t\t\t\t\t');
+    lines.push('====================\t\t\t\t\t\t\t\t\t\t');
+    lines.push('Date/Time\tTransaction Reference\tCustomer Name\tPet Name\tPet Breed\tRFID Tag\tAmount\tPayment Method\tPayment Platform\tStatus\t');
+
+    transactions.forEach(transaction => {
+        const dateTime = new Date(transaction.created_at).toLocaleString();
+        const row = [
+            dateTime,
+            transaction.transaction_reference || '',
+            transaction.customer_name || '',
+            transaction.pet_name || '',
+            transaction.pet_breed || '',
+            transaction.rfid_tag || '',
+            `₱${parseFloat(transaction.amount || 0).toFixed(2)}`,
+            transaction.payment_method || '',
+            transaction.payment_platform || '',
+            transaction.status || ''
+        ];
+        lines.push(row.join('\t') + '\t');
+    });
+
+    lines.push('');
+
+    // Pending Bills Section
+    lines.push('PENDING BILLS\t\t\t\t\t\t\t\t\t');
+    lines.push('=============\t\t\t\t\t\t\t\t\t');
+    lines.push('RFID Tag\tCustomer Name\tPet Name\tPet Breed\tTotal Amount\tCheck-in Time\tStatus\tServices\t');
+
+    pendingBills.forEach(bill => {
+        const checkinTime = new Date(bill.check_in_time).toLocaleString();
+
+        let parsedServices = '';
+        if (bill.services) {
+            const services = bill.services.split('; ');
+            const cleanServices = services
+                .map(s => s.trim())
+                .filter(s => s.length > 0)
+                .map(s => s.split(' - ₱')[0].trim())
+                .filter(s => s.length > 0);
+            parsedServices = cleanServices.join(', ');
+        }
+
+        const row = [
+            bill.custom_rfid || '',
+            bill.customer_name || '',
+            bill.pet_name || '',
+            bill.pet_breed || '',
+            `₱${parseFloat(bill.total_amount || 0).toFixed(2)}`,
+            checkinTime,
+            bill.status || '',
+            parsedServices || 'No services'
+        ];
+        lines.push(row.join('\t') + '\t');
+    });
+
+    return lines.join('\n');
+}
+
+
+// Generate transaction-only Excel report
+function generateTransactionReportExcel(transactions, startDate, endDate) {
+    const workbook = XLSX.utils.book_new();
+
+    // Get current user name for the report
+    const getCurrentUserName = () => {
+        if (!currentUser) return 'Unknown User';
+        const preferredName = (currentUser.full_name && currentUser.full_name.trim())
+            ? currentUser.full_name.trim()
+            : ((currentUser.username && currentUser.username.trim())
+                ? currentUser.username.trim()
+                : (currentUser.email ? currentUser.email.split('@')[0] : 'User'));
+        return preferredName;
+    };
+
+    // Transactions Sheet with header information
+    const transactionHeaders = ['Date/Time', 'Transaction Reference', 'Customer Name', 'Pet Name', 'Pet Breed', 'RFID Tag', 'Amount', 'Payment Method', 'Payment Platform', 'Status'];
+    const transactionData = [
+        ['ANIMATES PH - TRANSACTION DETAILS REPORT', '', '', '', '', '', '', '', '', ''],
+        ['Report Period', `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`, '', '', '', '', '', '', '', ''],
+        ['Generated on', new Date().toLocaleString(), '', '', '', '', '', '', '', ''],
+        ['Generated by', getCurrentUserName(), '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', '', ''],
+        transactionHeaders
+    ];
+
+    transactions.forEach(transaction => {
+        transactionData.push([
+            new Date(transaction.created_at).toLocaleString(),
+            transaction.transaction_reference || '',
+            transaction.customer_name || '',
+            transaction.pet_name || '',
+            transaction.pet_breed || '',
+            transaction.rfid_tag || '',
+            `₱${parseFloat(transaction.amount || 0).toFixed(2)}`,
+            transaction.payment_method || '',
+            transaction.payment_platform || '',
+            transaction.status || ''
+        ]);
+    });
+
+    const transactionSheet = XLSX.utils.aoa_to_sheet(transactionData);
+    formatDataSheetNew(transactionSheet, transactionData, 'Transactions');
+    autoFitColumns(transactionSheet, transactionData);
+    XLSX.utils.book_append_sheet(workbook, transactionSheet, 'Transactions');
+
+    return workbook;
+}
+
+// Format data sheets (Transactions, Pending Bills)
+function formatDataSheet(worksheet, data, sheetName) {
+    if (!worksheet || !data) return;
+    
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    
+    const thinBorder = {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } }
+    };
+    
+    // Apply formatting to each cell
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!worksheet[cellAddress]) continue;
+            
+            const cellValue = worksheet[cellAddress].v;
+            if (cellValue == null) continue;
+            
+            // Header row (row 0)
+            if (R === 0) {
+                worksheet[cellAddress].s = {
+                    font: { bold: true, size: 11, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '4472C4' } },
+                    alignment: { horizontal: 'center', vertical: 'center' },
+                    border: thinBorder
+                };
+            }
+            // Data rows
+            else {
+                worksheet[cellAddress].s = {
+                    border: thinBorder,
+                    alignment: { vertical: 'center' }
+                };
+                
+                // Right-align numbers and currency
+                if (cellValue.toString().includes('₱') || (!isNaN(cellValue) && cellValue !== '')) {
+                    worksheet[cellAddress].s.alignment.horizontal = 'right';
+                }
+                
+                // Alternate row colors for better readability
+                if (R % 2 === 0) {
+                    worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F8F9FA' } };
+                }
+            }
+        }
+    }
+}
+
+// Generate summary-only Excel report
+function generateSummaryReportExcel(transactions, pendingBills, startDate, endDate) {
+    const workbook = XLSX.utils.book_new();
+    const summaryData = buildSummarySheetData('ANIMATES PH - SUMMARY REPORT', transactions, pendingBills, startDate, endDate);
+    const worksheet = XLSX.utils.aoa_to_sheet(summaryData);
+    formatSummarySheetNew(worksheet, summaryData);
+    autoFitColumns(worksheet, summaryData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Summary');
+
+    return workbook;
 }
 
 // Close modal
@@ -1863,14 +3264,8 @@ async function loadTransactions() {
         
         if (data.success) {
             if (data.transactions && Array.isArray(data.transactions)) {
-                // Deduplicate by booking_id (fallback to rfid_tag)
-                const seenKeys = new Set();
-                currentTransactions = data.transactions.filter(t => {
-                    const key = t.booking_id ?? t.rfid_tag;
-                    if (seenKeys.has(key)) return false;
-                    seenKeys.add(key);
-                    return true;
-                });
+                // Show all transactions (no deduplication needed)
+                currentTransactions = data.transactions;
                 displayTransactions();
                 
                 if (currentTransactions.length === 0) {
@@ -1900,14 +3295,14 @@ function displayTransactions() {
     
     // Filter transactions
     let filteredTransactions = currentTransactions.filter(transaction => {
-        const matchesSearch = !searchTerm || 
+        const matchesSearch = !searchTerm ||
             transaction.customer_name.toLowerCase().includes(searchTerm) ||
             transaction.pet_name.toLowerCase().includes(searchTerm) ||
             transaction.rfid_tag.toLowerCase().includes(searchTerm);
-        
-        const matchesStatus = !statusFilter || transaction.status === statusFilter;
+
+        const matchesStatus = !statusFilter || statusFilter === 'all' || transaction.status === statusFilter;
         const matchesDate = filterByDate(transaction.created_at, dateFilter);
-        
+
         return matchesSearch && matchesStatus && matchesDate;
     });
     
@@ -2202,6 +3597,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add void form submission handler
     document.getElementById('voidForm')?.addEventListener('submit', handleVoidSubmission);
+
+    // Add report form submission handler
+    document.getElementById('reportForm')?.addEventListener('submit', handleReportSubmission);
+
+    // Add report type change handler for auto-preview
+    document.getElementById('reportType')?.addEventListener('change', () => {
+        const dateRange = document.getElementById('reportDateRange').value;
+        if (dateRange && dateRange !== 'custom') {
+            autoGeneratePreview();
+        }
+    });
 });
 
 function openReceiptModal(bookingId) {
@@ -2369,17 +3775,20 @@ async function exportVoidedTransactions() {
         
         // Create CSV content
         const headers = ['Date/Time', 'Customer', 'Pet', 'RFID', 'Amount', 'Payment Method', 'Reason', 'Voided At'];
+        // Escape all data to prevent Excel formula errors
+        const escapeCSV = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
+
         const csvContent = [
             headers.join(','),
             ...data.transactions.map(t => [
-                new Date(t.created_at).toLocaleString(),
-                `"${t.customer_name || 'N/A'}"`,
-                `"${t.pet_name || 'N/A'}"`,
-                t.rfid_tag || 'N/A',
+                escapeCSV(new Date(t.created_at).toLocaleString()),
+                escapeCSV(t.customer_name || 'N/A'),
+                escapeCSV(t.pet_name || 'N/A'),
+                escapeCSV(t.rfid_tag || 'N/A'),
                 t.amount,
-                t.payment_method || 'N/A',
-                `"${t.void_reason || 'No reason provided'}"`,
-                new Date(t.voided_at).toLocaleString()
+                escapeCSV(t.payment_method || 'N/A'),
+                escapeCSV(t.void_reason || 'No reason provided'),
+                escapeCSV(new Date(t.voided_at).toLocaleString())
             ].join(','))
         ].join('\n');
         
@@ -2406,7 +3815,7 @@ async function restoreTransaction(transactionId) {
     if (!confirm('Are you sure you want to restore this transaction? This will change its status back to completed.')) {
         return;
     }
-    
+
     try {
         const response = await fetch(`${API_BASE}billing.php?action=restore_transaction`, {
             method: 'POST',
@@ -2417,20 +3826,20 @@ async function restoreTransaction(transactionId) {
                 transaction_id: transactionId
             })
         });
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showNotification('Transaction restored successfully', 'success');
-            
+
             // Refresh the voided transactions list and stats
             await loadVoidedTransactions();
             await loadStats();
-            
+
             // Switch back to recent transactions to show the restored transaction
             showSection('recent-transactions');
             await loadTransactions();
@@ -2441,4 +3850,89 @@ async function restoreTransaction(transactionId) {
         console.error('Error restoring transaction:', error);
         showNotification('Failed to restore transaction', 'error');
     }
+}
+
+// Apply Excel formatting to workbook
+function applyExcelFormatting(workbook) {
+    workbook.SheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+
+        // Set column widths (auto-fit)
+        const colWidths = [];
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            let maxWidth = 12; // minimum width
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                const cell_address = XLSX.utils.encode_cell({c: C, r: R});
+                const cell = worksheet[cell_address];
+                if (cell && cell.v) {
+                    const cellValue = cell.v.toString();
+                    maxWidth = Math.max(maxWidth, cellValue.length);
+                }
+            }
+            colWidths.push({wch: Math.min(maxWidth + 3, 60)}); // max 60 chars, more padding
+        }
+        worksheet['!cols'] = colWidths;
+
+        // Define border style
+        const borderStyle = {
+            top: {style: "medium", color: {rgb: "000000"}},
+            bottom: {style: "thin", color: {rgb: "000000"}},
+            left: {style: "thin", color: {rgb: "000000"}},
+            right: {style: "thin", color: {rgb: "000000"}}
+        };
+
+        const headerBorderStyle = {
+            top: {style: "medium", color: {rgb: "000000"}},
+            bottom: {style: "medium", color: {rgb: "000000"}},
+            left: {style: "medium", color: {rgb: "000000"}},
+            right: {style: "medium", color: {rgb: "000000"}}
+        };
+
+        // Apply header formatting (first row of each sheet)
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const headerCell = XLSX.utils.encode_cell({c: C, r: range.s.r});
+            if (worksheet[headerCell]) {
+                worksheet[headerCell].s = {
+                    font: {bold: true, sz: 12, color: {rgb: "000000"}}, // Black text for better contrast
+                    fill: {fgColor: {rgb: "D4AF37"}}, // Gold background to match theme
+                    alignment: {horizontal: "center", vertical: "center", wrapText: true},
+                    border: headerBorderStyle
+                };
+            }
+        }
+
+        // Apply formatting to data rows
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_address = XLSX.utils.encode_cell({c: C, r: R});
+                const cell = worksheet[cell_address];
+                if (cell) {
+                    let cellStyle = {border: borderStyle, alignment: {wrapText: true}};
+
+                    // Right-align amount columns (containing ₱ or numbers)
+                    if (cell.v && (typeof cell.v === 'string' && cell.v.startsWith('₱') || typeof cell.v === 'number')) {
+                        cellStyle.alignment = {horizontal: "right", wrapText: true};
+                    }
+                    // Center-align status columns
+                    else if (C === range.e.c && cell.v && ['completed', 'voided', 'pending', 'cancelled'].includes(cell.v.toLowerCase())) {
+                        cellStyle.alignment = {horizontal: "center", wrapText: true};
+                    }
+
+                    // Alternate row colors for better readability (subtle gray)
+                    if (R % 2 === 1) { // Odd rows (data rows start from index 1)
+                        cellStyle.fill = {fgColor: {rgb: "F8FAFC"}}; // Very light gray
+                    }
+
+                    cell.s = cellStyle;
+                }
+            }
+        }
+
+        // Freeze header row
+        worksheet['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+        // Add filters to header row
+        worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range.s, {c: range.e.c, r: range.s.r}) };
+    });
 }

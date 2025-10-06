@@ -6,7 +6,6 @@ let bookingId = null;
 let rfidPollingInterval = null;
 let rfidAssigned = false;
 let lastNotifiedError = null; // Track last error to prevent spam
-let lastRFIDNotification = null; // Track last RFID notification to prevent spam
 let servicesData = {};
 let currentPetSize = '';
 // API base URL - adjust this to your server location
@@ -279,6 +278,10 @@ function renderCustomizablePackage(service, colors) {
         return '';
     }
 
+    // Check if package is available based on inventory
+    const isPackageAvailable = service.available !== false;
+    const unavailableMessage = service.unavailable_reason || '';
+
     // Calculate customized price
     let customizedPrice = basePrice;
     if (customization.selected) {
@@ -301,26 +304,28 @@ function renderCustomizablePackage(service, colors) {
     }
 
     let html = `
-        <div class="bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 hover:shadow-md">
-            <label class="flex items-center p-4 cursor-pointer">
+        <div class="bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 ${isPackageAvailable ? 'hover:shadow-md' : 'opacity-60'}">
+            <label class="flex items-center p-4 ${isPackageAvailable ? 'cursor-pointer' : 'cursor-not-allowed'}">
                 <input type="checkbox" class="package-checkbox w-5 h-5 text-primary rounded"
-                       data-package-id="${packageId}"
-                       data-service-id="${service.id}"
-                       data-service="${service.name}"
-                       data-base-price="${basePrice}"
-                       ${customization.selected ? 'checked' : ''}>
+                        data-package-id="${packageId}"
+                        data-service-id="${service.id}"
+                        data-service="${service.name}"
+                        data-base-price="${basePrice}"
+                        ${!isPackageAvailable ? 'disabled' : ''}
+                        ${customization.selected ? 'checked' : ''}>
                 <div class="ml-4 flex-1 flex justify-between items-center">
-                    <div>
-                        <span class="font-medium text-gray-900">${service.name}</span>
-                        <p class="text-sm text-gray-600">${service.description}</p>
+                    <div class="flex-1">
+                        <span class="font-medium ${isPackageAvailable ? 'text-gray-900' : 'text-gray-500'}">${service.name}</span>
+                        <p class="text-sm ${isPackageAvailable ? 'text-gray-600' : 'text-gray-400'}">${service.description}</p>
                         <p class="text-xs text-gray-500 mt-1">Click to customize package contents</p>
+                        ${!isPackageAvailable ? `<p class="text-xs text-red-600 mt-1">${unavailableMessage}</p>` : ''}
                     </div>
-                    <span class="text-lg font-bold text-primary">${priceDisplay}</span>
+                    <span class="text-lg font-bold ${isPackageAvailable ? 'text-primary' : 'text-gray-400'}">${priceDisplay}</span>
                 </div>
             </label>`;
 
-    // Show package contents when selected
-    if (customization.selected) {
+    // Show package contents when selected and available
+    if (customization.selected && isPackageAvailable) {
         html += `
             <div class="px-4 pb-4 border-t border-gray-200 mt-2 pt-3">
                 <p class="text-sm font-medium text-gray-700 mb-3">Customize your package:</p>
@@ -333,11 +338,11 @@ function renderCustomizablePackage(service, colors) {
             html += `
                 <label class="flex items-center text-sm">
                     <input type="checkbox"
-                           class="package-item-checkbox w-4 h-4 text-primary rounded"
-                           data-package-id="${packageId}"
-                           data-service-name="${item.name}"
-                           ${!isExcluded ? 'checked' : ''}
-                           ${isRequired ? 'disabled' : ''}>
+                            class="package-item-checkbox w-4 h-4 text-primary rounded"
+                            data-package-id="${packageId}"
+                            data-service-name="${item.name}"
+                            ${!isExcluded ? 'checked' : ''}
+                            ${isRequired ? 'disabled' : ''}>
                     <span class="ml-2 ${isRequired ? 'text-gray-600' : isExcluded ? 'line-through text-gray-400' : 'text-gray-700'}">
                         ${item.name} ${isRequired ? '(required)' : ''}
                     </span>
@@ -413,10 +418,17 @@ function renderServiceCategory(categoryKey, categoryTitle, color, services) {
         const price = getServicePrice(service);
         let priceDisplay = '';
         let isDisabled = false;
+        let unavailableMessage = '';
+
+        // Check inventory availability
+        if (!service.available) {
+            isDisabled = true;
+            unavailableMessage = service.unavailable_reason || 'Service temporarily unavailable';
+        }
 
         if (service.is_size_based && currentPetSize && price > 0) {
             priceDisplay = `₱${price.toFixed(2)}`;
-            isDisabled = false;
+            if (!isDisabled) isDisabled = false;
         } else if (service.is_size_based && !currentPetSize) {
             if (service.base_price && service.base_price > 0) {
                 priceDisplay = `From ₱${service.base_price.toFixed(2)}`;
@@ -429,40 +441,43 @@ function renderServiceCategory(categoryKey, categoryTitle, color, services) {
                     priceDisplay = 'Select pet size first';
                 }
             }
-            isDisabled = true;
+            if (!isDisabled) isDisabled = true;
         } else if (!service.is_size_based) {
             if (price > 0) {
                 priceDisplay = `₱${price.toFixed(2)}`;
-                isDisabled = false;
+                if (!isDisabled) isDisabled = false;
             } else if (service.base_price && service.base_price > 0) {
                 priceDisplay = `₱${service.base_price.toFixed(2)}`;
-                isDisabled = false;
+                if (!isDisabled) isDisabled = false;
             } else {
                 priceDisplay = 'Price not available';
-                isDisabled = true;
+                if (!isDisabled) isDisabled = true;
             }
         } else {
             priceDisplay = 'Select pet size first';
-            isDisabled = true;
+            if (!isDisabled) isDisabled = true;
         }
 
         const isChecked = selectedServices.some(s => s.id === service.id);
         html += `
-            <label class="flex items-center p-4 bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 cursor-pointer hover:shadow-md ${isDisabled ? 'opacity-60' : ''}">
+            <label class="flex items-center p-4 bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'}">
                 <input type="checkbox" class="service-checkbox w-5 h-5 text-primary rounded"
                         data-service-id="${service.id}"
                         data-service="${service.name}"
                         data-price="${price}"
-                        ${isDisabled ? 'disabled data-original-disabled="true"' : ''}
+                        ${isDisabled ? 'disabled' : ''}
                         ${isChecked ? 'checked' : ''}>
                 <div class="ml-4 flex-1 flex justify-between items-center">
-                    <div>
-                        <span class="font-medium text-gray-900">${service.name}</span>
-                        <p class="text-sm text-gray-600">${service.description}</p>
+                    <div class="flex-1">
+                        <span class="font-medium ${isDisabled ? 'text-gray-500' : 'text-gray-900'}">${service.name}</span>
+                        <p class="text-sm ${isDisabled ? 'text-gray-400' : 'text-gray-600'}">${service.description}</p>
                         ${service.is_size_based ? `<p class="text-xs text-gray-500 mt-1">Size-based pricing</p>` : ''}
-                        ${isDisabled && service.is_size_based ? `<p class="text-xs text-amber-600 mt-1">Please select pet size above</p>` : ''}
+                        ${isDisabled && service.is_size_based && !service.available ? `<p class="text-xs text-red-600 mt-1">${unavailableMessage}</p>` : ''}
+                        ${isDisabled && service.is_size_based && service.available ? `<p class="text-xs text-amber-600 mt-1">Please select pet size above</p>` : ''}
+                        ${isDisabled && !service.is_size_based && !service.available ? `<p class="text-xs text-red-600 mt-1">${unavailableMessage}</p>` : ''}
+                        ${isDisabled && !service.is_size_based && service.available ? `<p class="text-xs text-amber-600 mt-1">Price not available</p>` : ''}
                     </div>
-                    <span class="text-lg font-bold text-primary">${priceDisplay}</span>
+                    <span class="text-lg font-bold ${isDisabled ? 'text-gray-400' : 'text-primary'}">${priceDisplay}</span>
                 </div>
             </label>
         `;
@@ -1092,20 +1107,57 @@ function startRFIDAssignment() {
 function startRFIDPolling() {
     // Stop any existing polling
     stopRFIDPolling();
-    
+
     // Reset error tracking
     lastNotifiedError = null;
-    
-    // Poll every 2 seconds for new RFID data from MySQL
+
+    // Poll every 1 second for new RFID data from RFID endpoint (same as appointments_manager.html)
     rfidPollingInterval = setInterval(async () => {
         try {
-            const response = await fetch(API_BASE + 'check_in.php?action=get_latest_rfid');
+            const response = await fetch(API_BASE + 'rfid_endpoint.php?action=get_latest_rfid', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'dummy-token'}`
+                }
+            });
             const result = await response.json();
-            
-            if (result.success && !rfidAssigned) {
+
+            if (result.success && result.rfid && !rfidAssigned) {
                 // Clear any previous error
                 lastNotifiedError = null;
-                handleRFIDDetection(result);
+
+                // Apply same logic as appointments_manager.html
+                const rfidTag = result.rfid;
+                const physicalCardNumber = getPhysicalCardNumber(rfidTag);
+
+                // Update UI
+                document.getElementById('rfidStatus').textContent = 'RFID Card Detected!';
+                document.getElementById('rfidMessage').textContent = `${physicalCardNumber} assigned successfully`;
+                document.getElementById('assignedTag').innerHTML = `
+                    <div class="text-center">
+                        <div class="text-3xl font-mono font-bold text-primary mb-1">${rfidTag}</div>
+                        <div class="text-sm text-gray-600">${physicalCardNumber}</div>
+                    </div>
+                `;
+
+                // Hide the pulse animation
+                const pulseIndicator = document.querySelector('.flex.space-x-1');
+                if (pulseIndicator) {
+                    pulseIndicator.style.display = 'none';
+                }
+
+                // Store RFID data
+                petData.rfidTag = rfidTag;
+                rfidAssigned = true;
+
+                // Enable complete button
+                const completeBtn = document.getElementById('completeBtn');
+                completeBtn.disabled = false;
+                completeBtn.className = 'bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-medium transition-colors';
+
+                // Stop polling
+                stopRFIDPolling();
+
+                showNotification(`${physicalCardNumber} detected and assigned!`, 'success');
             } else if (!result.success && result.message) {
                 // Only show error notification if it's different from the last one
                 if (lastNotifiedError !== result.message) {
@@ -1124,7 +1176,7 @@ function startRFIDPolling() {
                 showNotification('Connection error. Please check your network.', 'error');
             }
         }
-    }, 2000);
+    }, 1000);
 }
 
 function stopRFIDPolling() {
@@ -1132,67 +1184,10 @@ function stopRFIDPolling() {
         clearInterval(rfidPollingInterval);
         rfidPollingInterval = null;
     }
-    // Reset error and RFID notification tracking when stopping
+    // Reset error tracking when stopping
     lastNotifiedError = null;
-    lastRFIDNotification = null;
 }
 
-function handleRFIDDetection(rfidData) {
-    const rfidStatus = document.getElementById('rfidStatus');
-    const rfidMessage = document.getElementById('rfidMessage');
-    const assignedTag = document.getElementById('assignedTag');
-    const pulseIndicator = document.querySelector('.flex.space-x-1'); // Select the pulse container
-    
-    if (rfidData.isFirstTap) {
-        // Get physical card number
-        const physicalCardNumber = getPhysicalCardNumber(rfidData.cardUID);
-        
-        // First tap - assign RFID for check-in
-        rfidStatus.textContent = 'RFID Card Detected!';
-        rfidMessage.textContent = `${physicalCardNumber} assigned successfully`;
-        assignedTag.innerHTML = `
-            <div class="text-center">
-                <div class="text-3xl font-mono font-bold text-primary mb-1">${rfidData.customUID}</div>
-                <div class="text-sm text-gray-600">${physicalCardNumber}</div>
-              
-            </div>
-        `;
-        
-        // Hide the pulse animation
-        if (pulseIndicator) {
-            pulseIndicator.style.display = 'none';
-        }
-        
-        // Store RFID data
-        petData.rfidTag = rfidData.customUID;
-        rfidAssigned = true;
-        
-        // Enable complete button
-        const completeBtn = document.getElementById('completeBtn');
-        completeBtn.disabled = false;
-        completeBtn.className = 'bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-medium transition-colors';
-        
-        // Stop polling
-        stopRFIDPolling();
-        
-        showNotification(`${physicalCardNumber} detected and assigned!`, 'success');
-        
-    } else {
-        // Get physical card number for subsequent taps too
-        const physicalCardNumber = getPhysicalCardNumber(rfidData.cardUID);
-
-        // Subsequent tap - show status update message
-        rfidStatus.textContent = `RFID Tap #${rfidData.tapCount} Detected`;
-        rfidMessage.textContent = `${physicalCardNumber} - Pet status updated`;
-
-        // Only show notification once per RFID card detection, not per tap
-        const cardNotificationKey = `${physicalCardNumber}-status-update`;
-        if (lastRFIDNotification !== cardNotificationKey) {
-            lastRFIDNotification = cardNotificationKey;
-            showNotification(`${physicalCardNumber} detected - Status updated`, 'info');
-        }
-    }
-}
 
 // Add this variable at the top with other global variables
 // Add this variable at the top with other global variables

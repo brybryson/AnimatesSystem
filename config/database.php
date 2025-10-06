@@ -12,7 +12,7 @@ class Database {
 
         try {
             $this->conn = new PDO(
-                "mysql:host=localhost;port=3306;dbname=" . $this->db_name,
+                "mysql:unix_socket=/Applications/XAMPP/xamppfiles/var/mysql/mysql.sock;dbname=" . $this->db_name,
                 $this->username,
                 $this->password,
                 array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION)

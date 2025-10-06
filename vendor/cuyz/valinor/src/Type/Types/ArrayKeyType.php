@@ -8,17 +8,19 @@ use CuyZ\Valinor\Compiler\Native\ComplianceNode;
 use CuyZ\Valinor\Compiler\Node;
 use CuyZ\Valinor\Mapper\Tree\Message\ErrorMessage;
 use CuyZ\Valinor\Mapper\Tree\Message\MessageBuilder;
+use CuyZ\Valinor\Type\CompositeType;
 use CuyZ\Valinor\Type\IntegerType;
 use CuyZ\Valinor\Type\Parser\Exception\Iterable\InvalidArrayKey;
 use CuyZ\Valinor\Type\ScalarType;
 use CuyZ\Valinor\Type\StringType;
+use CuyZ\Valinor\Type\DumpableType;
 use CuyZ\Valinor\Type\Type;
 use LogicException;
 
 use function is_int;
 
 /** @internal */
-final class ArrayKeyType implements ScalarType
+final class ArrayKeyType implements ScalarType, CompositeType, DumpableType
 {
     private static self $default;
 
@@ -26,16 +28,33 @@ final class ArrayKeyType implements ScalarType
 
     private static self $string;
 
-    /** @var non-empty-list<IntegerType|StringType> */
-    private array $types;
+    public function __construct(
+        /** @var non-empty-list<IntegerType|StringType> */
+        public readonly array $types,
+    ) {}
 
-    private string $signature;
-
-    private function __construct(Type $type)
+    public static function default(): self
     {
-        $types = $type instanceof UnionType
-            ? [...$type->types()]
-            : [$type];
+        return self::$default ??= new self([NativeIntegerType::get(), NativeStringType::get()]);
+    }
+
+    public static function integer(): self
+    {
+        return self::$integer ??= new self([NativeIntegerType::get()]);
+    }
+
+    public static function string(): self
+    {
+        return self::$string ??= new self([NativeStringType::get()]);
+    }
+
+    public static function from(Type $type): self
+    {
+        if ($type instanceof self) {
+            return $type;
+        }
+
+        $types = $type instanceof UnionType ? $type->types() : [$type];
 
         foreach ($types as $subType) {
             if (! $subType instanceof IntegerType && ! $subType instanceof StringType) {
@@ -44,37 +63,10 @@ final class ArrayKeyType implements ScalarType
         }
 
         /** @var non-empty-list<IntegerType|StringType> $types */
-        $this->types = $types;
-        $this->signature = $type->toString();
-    }
-
-    public static function default(): self
-    {
-        if (!isset(self::$default)) {
-            self::$default = new self(new UnionType(NativeIntegerType::get(), NativeStringType::get()));
-            self::$default->signature = 'array-key';
-        }
-
-        return self::$default;
-    }
-
-    public static function integer(): self
-    {
-        return self::$integer ??= new self(NativeIntegerType::get());
-    }
-
-    public static function string(): self
-    {
-        return self::$string ??= new self(NativeStringType::get());
-    }
-
-    public static function from(Type $type): self
-    {
         return match (true) {
-            $type instanceof self => $type,
             $type instanceof NativeIntegerType => self::integer(),
             $type instanceof NativeStringType => self::string(),
-            default => new self($type),
+            default => new self($types),
         };
     }
 
@@ -181,6 +173,11 @@ final class ArrayKeyType implements ScalarType
             ->build();
     }
 
+    public function traverse(): array
+    {
+        return $this->types;
+    }
+
     public function nativeType(): Type
     {
         $types = [];
@@ -190,14 +187,36 @@ final class ArrayKeyType implements ScalarType
         }
 
         if (count($types) === 1) {
-            return array_values($types)[0];
+            return reset($types);
         }
 
         return new UnionType(...array_values($types));
     }
 
+    public function dumpParts(): iterable
+    {
+        $types = $this->types;
+
+        while ($type = array_shift($types)) {
+            yield $type;
+
+            if ($types !== []) {
+                yield '|';
+            }
+        }
+    }
+
     public function toString(): string
     {
-        return $this->signature;
+        if ($this === self::default()) {
+            return 'array-key';
+        }
+
+        $signature = array_map(
+            static fn (Type $type): string => $type->toString(),
+            $this->types
+        );
+
+        return implode('|', $signature);
     }
 }

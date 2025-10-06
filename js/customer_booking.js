@@ -650,10 +650,17 @@ function renderServiceCategory(categoryKey, categoryTitle, color, services) {
         const price = getServicePrice(service, currentPetSize);
         let priceDisplay = '';
         let isDisabled = false;
+        let unavailableMessage = '';
+
+        // Check inventory availability
+        if (!service.available) {
+            isDisabled = true;
+            unavailableMessage = service.unavailable_reason || 'Service temporarily unavailable';
+        }
 
         if (service.is_size_based && currentPetSize && price > 0) {
             priceDisplay = `₱${price.toFixed(2)}`;
-            isDisabled = false;
+            if (!isDisabled) isDisabled = false;
         } else if (service.is_size_based && !currentPetSize) {
             if (service.base_price && service.base_price > 0) {
                 priceDisplay = `From ₱${service.base_price.toFixed(2)}`;
@@ -666,38 +673,41 @@ function renderServiceCategory(categoryKey, categoryTitle, color, services) {
                     priceDisplay = 'Select pet size first';
                 }
             }
-            isDisabled = true;
+            if (!isDisabled) isDisabled = true;
         } else if (!service.is_size_based) {
             if (price > 0) {
                 priceDisplay = `₱${price.toFixed(2)}`;
-                isDisabled = false;
+                if (!isDisabled) isDisabled = false;
             } else if (service.base_price && service.base_price > 0) {
                 priceDisplay = `₱${service.base_price.toFixed(2)}`;
-                isDisabled = false;
+                if (!isDisabled) isDisabled = false;
             } else {
                 priceDisplay = 'Price not available';
-                isDisabled = true;
+                if (!isDisabled) isDisabled = true;
             }
         } else {
             priceDisplay = 'Select pet size first';
-            isDisabled = true;
+            if (!isDisabled) isDisabled = true;
         }
 
         html += `
-            <label class="flex items-center p-4 bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 cursor-pointer hover:shadow-md ${isDisabled ? 'opacity-60' : ''}">
+            <label class="flex items-center p-4 bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'}">
                 <input type="checkbox" class="service-checkbox w-5 h-5 text-primary rounded"
                         data-service-id="${service.id}"
                         data-service="${service.name}"
                         data-price="${price}"
-                        ${isDisabled ? 'disabled data-original-disabled="true"' : ''}>
+                        ${isDisabled ? 'disabled' : ''}>
                 <div class="ml-4 flex-1 flex justify-between items-center">
-                    <div>
-                        <span class="font-medium text-gray-900">${service.name}</span>
-                        <p class="text-sm text-gray-600">${service.description}</p>
+                    <div class="flex-1">
+                        <span class="font-medium ${isDisabled ? 'text-gray-500' : 'text-gray-900'}">${service.name}</span>
+                        <p class="text-sm ${isDisabled ? 'text-gray-400' : 'text-gray-600'}">${service.description}</p>
                         ${service.is_size_based ? `<p class="text-xs text-gray-500 mt-1">Size-based pricing</p>` : ''}
-                        ${isDisabled && service.is_size_based ? `<p class="text-xs text-amber-600 mt-1">Please select pet size above</p>` : ''}
+                        ${isDisabled && service.is_size_based && !service.available ? `<p class="text-xs text-red-600 mt-1">${unavailableMessage}</p>` : ''}
+                        ${isDisabled && service.is_size_based && service.available ? `<p class="text-xs text-amber-600 mt-1">Please select pet size above</p>` : ''}
+                        ${isDisabled && !service.is_size_based && !service.available ? `<p class="text-xs text-red-600 mt-1">${unavailableMessage}</p>` : ''}
+                        ${isDisabled && !service.is_size_based && service.available ? `<p class="text-xs text-amber-600 mt-1">Price not available</p>` : ''}
                     </div>
-                    <span class="text-lg font-bold text-primary">${priceDisplay}</span>
+                    <span class="text-lg font-bold ${isDisabled ? 'text-gray-400' : 'text-primary'}">${priceDisplay}</span>
                 </div>
             </label>
         `;
@@ -754,6 +764,10 @@ function renderCustomizablePackage(service, colors) {
         return '';
     }
 
+    // Check if package is available based on inventory
+    const isPackageAvailable = service.available !== false;
+    const unavailableMessage = service.unavailable_reason || '';
+
     // Calculate customized price
     let customizedPrice = basePrice;
     if (customization.selected) {
@@ -779,26 +793,28 @@ function renderCustomizablePackage(service, colors) {
     }
 
     let html = `
-        <div class="bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 hover:shadow-md">
-            <label class="flex items-center p-4 cursor-pointer">
+        <div class="bg-white/80 rounded-lg border ${colors.itemBorder} transition-all duration-200 ${isPackageAvailable ? 'hover:shadow-md' : 'opacity-60'}">
+            <label class="flex items-center p-4 ${isPackageAvailable ? 'cursor-pointer' : 'cursor-not-allowed'}">
                 <input type="checkbox" class="package-checkbox w-5 h-5 text-primary rounded"
                         data-package-id="${packageId}"
                         data-service-id="${service.id}"
                         data-service="${service.name}"
                         data-base-price="${basePrice}"
+                        ${!isPackageAvailable ? 'disabled' : ''}
                         ${customization.selected ? 'checked' : ''}>
                 <div class="ml-4 flex-1 flex justify-between items-center">
-                    <div>
-                        <span class="font-medium text-gray-900">${service.name}</span>
-                        <p class="text-sm text-gray-600">${service.description}</p>
+                    <div class="flex-1">
+                        <span class="font-medium ${isPackageAvailable ? 'text-gray-900' : 'text-gray-500'}">${service.name}</span>
+                        <p class="text-sm ${isPackageAvailable ? 'text-gray-600' : 'text-gray-400'}">${service.description}</p>
                         <p class="text-xs text-gray-500 mt-1">Click to customize package contents</p>
+                        ${!isPackageAvailable ? `<p class="text-xs text-red-600 mt-1">${unavailableMessage}</p>` : ''}
                     </div>
-                    <span class="text-lg font-bold text-primary">${priceDisplay}</span>
+                    <span class="text-lg font-bold ${isPackageAvailable ? 'text-primary' : 'text-gray-400'}">${priceDisplay}</span>
                 </div>
             </label>`;
 
-    // Show package contents when selected
-    if (customization.selected) {
+    // Show package contents when selected and available
+    if (customization.selected && isPackageAvailable) {
         html += `
             <div class="px-4 pb-4 border-t border-gray-200 mt-2 pt-3">
                 <p class="text-sm font-medium text-gray-700 mb-3">Customize your package:</p>

@@ -7,7 +7,7 @@ namespace CuyZ\Valinor\Type\Types;
 use CuyZ\Valinor\Compiler\Native\ComplianceNode;
 use CuyZ\Valinor\Compiler\Node;
 use CuyZ\Valinor\Type\CombiningType;
-use CuyZ\Valinor\Type\CompositeType;
+use CuyZ\Valinor\Type\DumpableType;
 use CuyZ\Valinor\Type\Type;
 use CuyZ\Valinor\Type\Types\Exception\ForbiddenMixedType;
 
@@ -16,14 +16,23 @@ use function array_values;
 use function implode;
 
 /** @internal */
-final class UnionType implements CombiningType
+final class UnionType implements CombiningType, DumpableType
 {
     /** @var non-empty-list<Type> */
     private array $types;
 
-    private string $signature;
-
+    /**
+     * @no-named-arguments
+     */
     public function __construct(Type $type, Type $otherType, Type ...$otherTypes)
+    {
+        $this->types = [$type, $otherType, ...$otherTypes];
+    }
+
+    /**
+     * @no-named-arguments
+     */
+    public static function from(Type $type, Type $otherType, Type ...$otherTypes): self
     {
         $types = [$type, $otherType, ...$otherTypes];
         $filteredTypes = [];
@@ -44,8 +53,7 @@ final class UnionType implements CombiningType
             $filteredTypes[] = $subType;
         }
 
-        $this->types = $filteredTypes;
-        $this->signature = implode('|', array_map(fn (Type $type) => $type->toString(), $this->types));
+        return new self(...$filteredTypes);
     }
 
     public function accepts(mixed $value): bool
@@ -103,17 +111,7 @@ final class UnionType implements CombiningType
 
     public function traverse(): array
     {
-        $types = [];
-
-        foreach ($this->types as $type) {
-            $types[] = $type;
-
-            if ($type instanceof CompositeType) {
-                $types = [...$types, ...$type->traverse()];
-            }
-        }
-
-        return $types;
+        return $this->types;
     }
 
     public function types(): array
@@ -136,8 +134,21 @@ final class UnionType implements CombiningType
         return new self(...array_values($subNativeTypes));
     }
 
+    public function dumpParts(): iterable
+    {
+        $types = $this->types;
+
+        while ($type = array_shift($types)) {
+            yield $type;
+
+            if ($types !== []) {
+                yield '|';
+            }
+        }
+    }
+
     public function toString(): string
     {
-        return $this->signature;
+        return implode('|', array_map(static fn (Type $type) => $type->toString(), $this->types));
     }
 }

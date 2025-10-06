@@ -1,11 +1,21 @@
 # CHANGELOG
 
-## The future of the Firebase Admin PHP SDK
-
-Please read about the future of the Firebase Admin PHP SDK on the
-[SDK's GitHub Repository](https://github.com/kreait/firebase-php).
+**Support the project:** This SDK is downloaded 1M+ times monthly and powers thousands of applications.
+If it saves you or your team time, please consider [sponsoring its development](https://github.com/sponsors/jeromegamez).
 
 ## [Unreleased]
+
+## [7.22.0] - 2025-09-21
+
+### Added
+
+* Added support for PHP 8.5
+
+### Changed
+
+* The project now features a custom logo (I came up with it myself, and took the wise decision to not look up if there's something similar already)
+* Refined README for improved clarity, removed outdated documentation sections, and streamlined project support messaging with a more positive call to action
+* Documentation now uses the modern Furo theme, providing a cleaner and more pleasant reading experience
 
 ## [7.21.2] - 2025-08-15
 
@@ -390,7 +400,8 @@ See **[UPGRADE-7.0](UPGRADE-7.0.md) for more details on the changes between 6.x 
 
 https://github.com/kreait/firebase-php/blob/6.9.6/CHANGELOG.md
 
-[Unreleased]: https://github.com/kreait/firebase-php/compare/7.21.2...7.x
+[Unreleased]: https://github.com/kreait/firebase-php/compare/7.22.0...7.x
+[7.22.0]: https://github.com/kreait/firebase-php/compare/7.21.2...7.22.0
 [7.21.2]: https://github.com/kreait/firebase-php/compare/7.21.1...7.21.2
 [7.21.1]: https://github.com/kreait/firebase-php/compare/7.21.0...7.21.1
 [7.21.0]: https://github.com/kreait/firebase-php/compare/7.20.0...7.21.0

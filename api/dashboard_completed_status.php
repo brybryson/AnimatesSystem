@@ -18,41 +18,81 @@ try {
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 6;
     $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
 
+    // Get filter parameters
+    $period = $_GET['period'] ?? 'today';
+    $startDate = $_GET['start_date'] ?? null;
+    $endDate = $_GET['end_date'] ?? null;
+
+    // Build date condition based on period or custom range
+    $dateCondition = '';
+    $params = [];
+
+    if ($startDate && $endDate) {
+        // Custom date range
+        $dateCondition = "DATE(a.check_in_time) BETWEEN ? AND ?";
+        $params = [$startDate, $endDate];
+    } else {
+        // Predefined periods
+        switch ($period) {
+            case 'today':
+                $dateCondition = "DATE(a.check_in_time) = CURDATE()";
+                break;
+            case 'week':
+                $dateCondition = "YEARWEEK(a.check_in_time, 1) = YEARWEEK(CURDATE(), 1)";
+                break;
+            case 'month':
+                $dateCondition = "YEAR(a.check_in_time) = YEAR(CURDATE()) AND MONTH(a.check_in_time) = MONTH(CURDATE())";
+                break;
+            default:
+                $dateCondition = "DATE(a.check_in_time) = CURDATE()";
+        }
+    }
+
     // Get total count for pagination
     $countStmt = $db->prepare("
         SELECT COUNT(*) as total
-        FROM bookings b
-        JOIN pets p ON b.pet_id = p.id
-        JOIN customers c ON p.customer_id = c.id
-        WHERE DATE(b.check_in_time) = CURDATE()
-        AND b.status = 'completed'
+        FROM appointments a
+        JOIN pets p ON a.pet_id = p.id
+        LEFT JOIN users u ON a.user_id = u.id
+        WHERE $dateCondition
+        AND a.status = 'completed'
+        AND a.check_in_time IS NOT NULL
     ");
-    $countStmt->execute();
+    if (!empty($params)) {
+        $countStmt->execute($params);
+    } else {
+        $countStmt->execute();
+    }
     $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
-    // Get today's completed bookings with pet and customer information
+    // Get completed appointments with pet and owner information
     $stmt = $db->prepare("
         SELECT
-            b.id,
-            b.pet_id,
-            b.custom_rfid,
-            b.status,
-            b.check_in_time,
-            b.actual_completion,
+            a.id,
+            a.pet_id,
+            a.custom_rfid,
+            a.status,
+            a.check_in_time,
+            a.updated_at as completion_time,
             p.name as pet_name,
             p.breed,
-            c.name as owner_name
-        FROM bookings b
-        JOIN pets p ON b.pet_id = p.id
-        JOIN customers c ON p.customer_id = c.id
-        WHERE DATE(b.check_in_time) = CURDATE()
-        AND b.status = 'completed'
-        ORDER BY b.actual_completion DESC
+            u.full_name as owner_name
+        FROM appointments a
+        JOIN pets p ON a.pet_id = p.id
+        LEFT JOIN users u ON a.user_id = u.id
+        WHERE $dateCondition
+        AND a.status = 'completed'
+        AND a.check_in_time IS NOT NULL
+        ORDER BY a.updated_at DESC
         LIMIT :limit OFFSET :offset
     ");
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $stmt->execute();
+    if (!empty($params)) {
+        $stmt->execute(array_merge($params, [$limit, $offset]));
+    } else {
+        $stmt->execute();
+    }
 
     $stmt->execute();
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);

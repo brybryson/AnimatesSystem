@@ -163,25 +163,6 @@
                     </div>
                 </div>
 
-                <!-- RFID Scanner Status - Full Width -->
-                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6 mb-6">
-                    <div class="flex items-center mb-6">
-                        <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-full mr-4">
-                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-gray-900">RFID Scanner Status</h3>
-                            <p class="text-sm text-gray-600">Scanner ready for operations</p>
-                        </div>
-                    </div>
-                    <div class="bg-gradient-to-r from-gold-500 to-gold-600 text-white p-6 rounded-xl text-center">
-                        <div class="text-lg font-semibold mb-2">Scanner Ready</div>
-                        <p class="text-gold-100 mb-4">Last scan: A1B2C3D4 - 2 minutes ago</p>
-                        <button class="btn-hover bg-white text-gold-600 px-6 py-3 rounded-xl font-semibold transition-all duration-200" onclick="simulateRFIDScan()">Simulate RFID Scan</button>
-                    </div>
-                </div>
 
                 <!-- 2-Column Layout for Status Sections -->
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
@@ -820,12 +801,33 @@
             return true;
         }
 
+        // Role-based navigation control
+        function setupRoleBasedNavigation() {
+            const userRole = localStorage.getItem('auth_role');
+
+            if (userRole === 'admin') {
+                // Hide Appointments and Billing for admin users
+                const appointmentsLink = document.querySelector('a[href="appointments_employees.html"]');
+                const billingLink = document.querySelector('a[href="billing_management.html"]');
+                const mobileAppointmentsLink = document.querySelector('#mobileMenu a[href="appointments_employees.html"]');
+                const mobileBillingLink = document.querySelector('#mobileMenu a[href="billing_management.html"]');
+
+                if (appointmentsLink) appointmentsLink.style.display = 'none';
+                if (billingLink) billingLink.style.display = 'none';
+                if (mobileAppointmentsLink) mobileAppointmentsLink.style.display = 'none';
+                if (mobileBillingLink) mobileBillingLink.style.display = 'none';
+            }
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             // Check authentication first
             if (!checkAuthentication()) {
                 return; // Stop execution if not authenticated
             }
+
+            // Set up role-based navigation
+            setupRoleBasedNavigation();
 
             // Set up filter button click handlers
             setupFilterButtons();

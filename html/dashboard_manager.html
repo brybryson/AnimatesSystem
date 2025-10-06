@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PetCare Pro - RFID Grooming Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#D4AF37',
+                        secondary: '#8C7A1E',
+                        gold: {
+                            50: '#FFFBEB',
+                            100: '#FEF3C7',
+                            200: '#FDE68A',
+                            300: '#FCD34D',
+                            400: '#FBBF24',
+                            500: '#D4AF37',
+                            600: '#D97706',
+                            700: '#B45309',
+                            800: '#92400E',
+                            900: '#78350F'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+        .gradient-bg { background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
+        .card-shadow { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        .btn-hover { transition: all 0.3s ease; }
+        .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(212, 175, 55, 0.4); }
+        .status-waiting { background: #fff3cd; color: #856404; }
+        .status-bathing { background: #cce5ff; color: #0066cc; }
+        .status-grooming { background: #ffe6cc; color: #cc6600; }
+        .status-ready { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex flex-col">
+    <!-- Decorative background elements -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-gold-200/30 to-gold-300/20 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-gold-100/30 to-gold-200/20 rounded-full blur-3xl"></div>
+    </div>
+
+    <header class="relative bg-white/80 backdrop-blur-sm shadow-sm border-b border-gold-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-gold-200 rounded-full blur-sm"></div>
+                        <img src="../animates_logo.png" alt="Animates Logo" class="relative h-14 w-14 object-contain">
+                    </div>
+                    <div>
+                        <p class="text-lg font-semibold text-gold-700">Animates PH</p>
+                        <p class="text-sm text-gold-600 font-medium">Camaro Branch</p>
+                        <p class="text-xs text-gray-500">Dashboard</p>
+                    </div>
+                </div>
+                <!-- Navigation -->
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="dashboard_manager.html" class="nav-link text-gold-600 font-semibold transition-colors duration-200 hover:text-gold-700">Dashboard</a>
+                    <a href="appointments_manager.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Appointments</a>
+                    <a href="inventory_management.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Inventory</a>
+                    <a href="vendor_management.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Vendors</a>
+                    <a href="reports_manager.html" class="nav-link text-gray-700 font-medium transition-colors duration-200 hover:text-gold-600">Reports</a>
+
+                    <div class="border-l border-gray-300 pl-6 ml-2">
+                        <button onclick="logout()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </nav>
+
+                <!-- Mobile menu button -->
+                <button class="md:hidden p-2" onclick="toggleMobileMenu()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Mobile Navigation -->
+            <div id="mobileMenu" class="md:hidden hidden pb-4">
+                <div class="flex flex-col space-y-2">
+                    <a href="dashboard_manager.html" class="mobile-nav-link text-gold-600 font-semibold py-2 transition-colors duration-200">Dashboard</a>
+                    <a href="appointments_manager.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Appointments</a>
+                    <a href="inventory_management.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Inventory</a>
+                    <a href="vendor_management.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Vendors</a>
+                    <a href="reports_manager.html" class="mobile-nav-link text-gray-700 font-medium py-2 transition-colors duration-200 hover:text-gold-600">Reports</a>
+
+                    <div class="border-t border-gray-300 pt-3 mt-3">
+                        <button onclick="logout()" class="flex items-center space-x-2 text-gray-700 font-medium transition-colors duration-200 hover:text-red-600 py-2 w-full text-left">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative flex-grow px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-7xl mx-auto">
+            <!-- Page Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+                <p class="text-gray-600">Real-time overview of your grooming operations</p>
+            </div>
+
+            <!-- Dashboard Page -->
+            <div id="dashboard" class="page active">
+
+                <!-- Enhanced Quick Stats -->
+                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6 mb-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Statistics
+                        </h3>
+                        <!-- Statistics Controls -->
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            <!-- Left Side: Filters -->
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <!-- Period Filter Buttons -->
+                                <div class="flex gap-2">
+                                    <button id="filter-today" class="px-4 py-2 text-sm font-medium rounded-lg bg-gold-500 text-white hover:bg-gold-600 transition-colors">Today</button>
+                                    <button id="filter-week" class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">This Week</button>
+                                    <button id="filter-month" class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">This Month</button>
+                                </div>
+
+                                <!-- Custom Range Button -->
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm text-gray-600">|</span>
+                                    <button id="open-custom-range-modal" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                        Custom Range
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Right Side: Export Button -->
+                            <div class="flex justify-end lg:justify-start">
+                                <button id="export-stats" class="px-4 py-2 text-sm font-medium rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                            <div class="text-2xl font-bold text-blue-700" id="totalPets">-</div>
+                            <div class="text-sm text-blue-600 font-medium">Pets Today</div>
+                        </div>
+                        <div class="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
+                            <div class="text-2xl font-bold text-orange-700" id="inProgress">-</div>
+                            <div class="text-sm text-orange-600 font-medium">In Progress</div>
+                        </div>
+                        <div class="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
+                            <div class="text-2xl font-bold text-green-700" id="completed">-</div>
+                            <div class="text-sm text-green-600 font-medium">Completed</div>
+                        </div>
+                        <div class="text-center p-4 bg-gradient-to-br from-gold-50 to-gold-100 rounded-xl border border-gold-200">
+                            <div class="text-2xl font-bold text-gold-700" id="revenue">-</div>
+                            <div class="text-sm text-gold-600 font-medium">Today's Revenue</div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- 2-Column Layout for Status Sections -->
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+                    <!-- Left Column - Current Status -->
+                    <div>
+                        <!-- Current Status Section -->
+                        <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6">
+                            <div class="flex items-center mb-6">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full mr-4">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-gray-900">Current Status</h3>
+                                    <p class="text-sm text-gray-600">Active grooming sessions</p>
+                                </div>
+                            </div>
+                            <div class="space-y-4" id="currentStatusContainer">
+                                <!-- Current status items will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Completed Status -->
+                    <div>
+                        <!-- Completed Status Section -->
+                        <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-6">
+                            <div class="flex items-center mb-6">
+                                <div class="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-full mr-4">
+                                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-gray-900">Completed Today</h3>
+                                    <p class="text-sm text-gray-600">Finished grooming sessions</p>
+                                </div>
+                            </div>
+                            <div class="space-y-4" id="completedStatusContainer">
+                                <!-- Completed status items will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+
+            
+                </main>
+            
+                <!-- Custom Range Modal -->
+                <div id="customRangeModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10001] hidden">
+                    <div class="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-white/20 transform animate-in fade-in-0 zoom-in-95 duration-300">
+                        <div class="text-center">
+                            <!-- Icon container -->
+                            <div class="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+            
+                            <!-- Title -->
+                            <h3 class="text-xl font-bold text-gray-900 mb-6">Select Custom Date Range</h3>
+            
+                            <!-- Date Inputs -->
+                            <div class="space-y-4 mb-8">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                                    <input type="date" id="modalStartDate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-colors">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                                    <input type="date" id="modalEndDate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-colors">
+                                </div>
+                            </div>
+            
+                            <!-- Action Buttons -->
+                            <div class="flex gap-3">
+                                <button onclick="closeCustomRangeModal()" class="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:bg-gray-50">
+                                    Cancel
+                                </button>
+                                <button onclick="applyCustomRange()" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                                    Apply Range
+                                </button>
+                            </div>
+            
+                            <!-- Clear Button -->
+                            <div class="mt-4">
+                                <button onclick="clearCustomRange()" class="w-full text-sm text-gray-500 hover:text-gray-700 underline">
+                                    Clear and reset to Today
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            
+                <!-- Footer -->
+                <footer class="bg-white border-t mt-12">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                        <div class="text-center text-sm text-gray-500">
+                            <p>&copy; 2025 Animates Pet Boutique & Grooming Salon. Professional Pet Care Services.</p>
+                            <p class="mt-2">📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567 | 📧 animates.ph.fairview@gmail.com</p>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+
+            
+        </div>
+    </div>
+
+    <!-- Logout Confirmation Modal -->
+    <div id="logoutModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10001] hidden">
+        <div class="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-white/20 transform animate-in fade-in-0 zoom-in-95 duration-300">
+            <div class="text-center">
+                <!-- Icon container with enhanced styling -->
+                <div class="w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+                    </svg>
+                </div>
+
+                <!-- Title with better typography -->
+                <h3 class="text-xl font-bold text-gray-900 mb-3">Confirm Logout</h3>
+
+                <!-- Message with improved spacing -->
+                <p class="text-gray-600 mb-8 leading-relaxed">Are you sure you want to log out? You will need to sign in again to access this page.</p>
+
+                <!-- Enhanced button styling -->
+                <div class="flex gap-3">
+                    <button onclick="closeLogoutModal()" class="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button onclick="confirmLogout()" class="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data
+        let petData = [
+            {
+                rfid: 'A1B2C3D4',
+                name: 'Snowy',
+                breed: 'Shih Tzu',
+                owner: 'Maria Santos',
+                phone: '09123456789',
+                status: 'grooming',
+                checkinTime: '10:00 AM',
+                services: ['Full Grooming', 'Nail Trimming'],
+                staff: 'Sarah Johnson'
+            },
+            {
+                rfid: 'B2C3D4E5',
+                name: 'Buddy',
+                breed: 'Golden Retriever',
+                owner: 'John Cruz',
+                phone: '09987654321',
+                status: 'bathing',
+                checkinTime: '10:30 AM',
+                services: ['Basic Bath', 'Ear Cleaning'],
+                staff: 'Mike Rivera'
+            },
+            {
+                rfid: 'C3D4E5F6',
+                name: 'Luna',
+                breed: 'Persian Cat',
+                owner: 'Anna Reyes',
+                phone: '09555123456',
+                status: 'ready',
+                checkinTime: '9:30 AM',
+                services: ['Basic Bath', 'Ear Cleaning'],
+                staff: 'Lisa Chen'
+            }
+        ];
+
+        let customerData = [
+            {
+                name: 'Maria Santos',
+                phone: '09123456789',
+                email: 'maria@email.com',
+                pets: ['Snowy (Shih Tzu)', 'Max (Beagle)'],
+                visits: 12,
+                lastVisit: '2025-08-10'
+            },
+            {
+                name: 'John Cruz',
+                phone: '09987654321',
+                email: 'john@email.com',
+                pets: ['Buddy (Golden Retriever)'],
+                visits: 8,
+                lastVisit: '2025-08-10'
+            },
+            {
+                name: 'Anna Reyes',
+                phone: '09555123456',
+                email: 'anna@email.com',
+                pets: ['Luna (Persian Cat)', 'Milo (Maine Coon)'],
+                visits: 15,
+                lastVisit: '2025-08-09'
+            }
+        ];
+
+        // Global variables for custom date range tracking
+        let currentCustomStartDate = null;
+        let currentCustomEndDate = null;
+
+
+        // Mobile menu toggle function
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Logout modal elements
+        const logoutModal = document.getElementById('logoutModal');
+
+        // Logout function
+        function logout() {
+            logoutModal.classList.remove('hidden');
+        }
+
+        // Close logout modal
+        function closeLogoutModal() {
+            logoutModal.classList.add('hidden');
+        }
+
+        // Confirm logout
+        function confirmLogout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_role');
+            localStorage.removeItem('auth_email');
+            localStorage.removeItem('auth_staff_role');
+            localStorage.removeItem('auth_user_id');
+
+            // Prevent back navigation by replacing current history entry
+            history.replaceState(null, null, 'admin_staff_auth.html');
+
+            // Redirect to login page
+            window.location.href = 'admin_staff_auth.html';
+        }
+
+        // Make logout functions globally accessible
+        window.logout = logout;
+        window.closeLogoutModal = closeLogoutModal;
+        window.confirmLogout = confirmLogout;
+
+        // Navigation function
+        function showPage(pageId) {
+            // Hide all pages
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+
+            // Show selected page
+            document.getElementById(pageId).classList.add('active');
+
+            // Update navigation
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.classList.remove('text-gold-600', 'font-semibold');
+                link.classList.add('text-gray-700', 'font-medium');
+            });
+            event.target.classList.remove('text-gray-700', 'font-medium');
+            event.target.classList.add('text-gold-600', 'font-semibold');
+
+            // Load page-specific content
+            loadPageContent(pageId);
+        }
+
+        // Load content for specific pages
+        function loadPageContent(pageId) {
+            switch(pageId) {
+                case 'customers':
+                    loadCustomerContent();
+                    break;
+                case 'billing':
+                    setupBillingPage();
+                    break;
+            }
+        }
+
+        // Fetch dashboard stats from API
+        async function fetchDashboardStats(period = 'today', startDate = null, endDate = null) {
+            try {
+                let url = `../api/dashboard_stats.php?period=${period}`;
+                if (startDate && endDate) {
+                    url += `&start_date=${startDate}&end_date=${endDate}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('totalPets').textContent = data.data.total_pets;
+                    document.getElementById('inProgress').textContent = data.data.in_progress;
+                    document.getElementById('completed').textContent = data.data.completed;
+                    document.getElementById('revenue').textContent = '₱' + data.data.revenue.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+                    // Update stat labels based on period
+                    updateStatLabels(period, startDate, endDate);
+                } else {
+                    console.error('Failed to fetch stats:', data.error);
+                }
+            } catch (error) {
+                console.error('Error fetching dashboard stats:', error);
+            }
+        }
+
+        // Update statistic labels based on selected period
+        function updateStatLabels(period, startDate, endDate) {
+            const labels = {
+                'today': ['Pets Today', 'In Progress', 'Completed', 'Today\'s Revenue'],
+                'week': ['Pets This Week', 'In Progress', 'Completed', 'This Week\'s Revenue'],
+                'month': ['Pets This Month', 'In Progress', 'Completed', 'This Month\'s Revenue'],
+                'custom': ['Pets in Range', 'In Progress', 'Completed', 'Revenue in Range']
+            };
+
+            const currentLabels = startDate && endDate ? labels.custom : (labels[period] || labels.today);
+
+            const labelElements = [
+                document.querySelector('#totalPets').nextElementSibling,
+                document.querySelector('#inProgress').nextElementSibling,
+                document.querySelector('#completed').nextElementSibling,
+                document.querySelector('#revenue').nextElementSibling
+            ];
+
+            labelElements.forEach((element, index) => {
+                if (element && currentLabels[index]) {
+                    element.textContent = currentLabels[index];
+                }
+            });
+        }
+
+        // Current status pagination
+        let currentStatusPage = 0;
+        const currentStatusLimit = 6;
+
+        // Fetch current status data from API
+        async function fetchCurrentStatus(page = 0) {
+            try {
+                // Get current filter period
+                const activeButton = document.querySelector('[id^="filter-"].bg-gold-500, [id^="filter-"].bg-blue-500');
+                let period = 'today';
+                let startDate = null;
+                let endDate = null;
+
+                if (activeButton) {
+                    const buttonId = activeButton.id.replace('filter-', '').replace('open-custom-range-modal', 'custom');
+                    if (buttonId === 'custom' && currentCustomStartDate && currentCustomEndDate) {
+                        period = 'custom';
+                        startDate = currentCustomStartDate;
+                        endDate = currentCustomEndDate;
+                    } else {
+                        period = buttonId;
+                    }
+                }
+
+                let url = `../api/dashboard_current_status.php?limit=${currentStatusLimit}&offset=${page * currentStatusLimit}&period=${period}`;
+                if (startDate && endDate) {
+                    url += `&start_date=${startDate}&end_date=${endDate}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    updateCurrentStatus(data.data, data.pagination);
+                } else {
+                    console.error('Failed to fetch current status:', data.error);
+                }
+            } catch (error) {
+                console.error('Error fetching current status:', error);
+            }
+        }
+
+        // Completed status pagination
+        let completedStatusPage = 0;
+        const completedStatusLimit = 6;
+
+        // Fetch completed status data from API
+        async function fetchCompletedStatus(page = 0) {
+            try {
+                // Get current filter period
+                const activeButton = document.querySelector('[id^="filter-"].bg-gold-500, [id^="filter-"].bg-blue-500');
+                let period = 'today';
+                let startDate = null;
+                let endDate = null;
+
+                if (activeButton) {
+                    const buttonId = activeButton.id.replace('filter-', '').replace('open-custom-range-modal', 'custom');
+                    if (buttonId === 'custom' && currentCustomStartDate && currentCustomEndDate) {
+                        period = 'custom';
+                        startDate = currentCustomStartDate;
+                        endDate = currentCustomEndDate;
+                    } else {
+                        period = buttonId;
+                    }
+                }
+
+                let url = `../api/dashboard_completed_status.php?limit=${completedStatusLimit}&offset=${page * completedStatusLimit}&period=${period}`;
+                if (startDate && endDate) {
+                    url += `&start_date=${startDate}&end_date=${endDate}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    updateCompletedStatus(data.data, data.pagination);
+                } else {
+                    console.error('Failed to fetch completed status:', data.error);
+                }
+            } catch (error) {
+                console.error('Error fetching completed status:', error);
+            }
+        }
+
+        // Update current status display
+        function updateCurrentStatus(bookings, pagination) {
+            const container = document.getElementById('currentStatusContainer').parentElement;
+            const statusContainer = document.getElementById('currentStatusContainer');
+
+            let html = '';
+
+            if (!bookings || bookings.length === 0) {
+                html = '<p class="text-gray-500 text-center py-4">No active bookings for today</p>';
+            } else {
+                html = bookings.map(booking => {
+                    // Map status to color classes (changed Waiting from gray to amber/yellow)
+                    const statusColors = {
+                        'Waiting': 'bg-amber-100 text-amber-700 border-amber-200',
+                        'In Progress': 'bg-blue-100 text-blue-700 border-blue-200',
+                        'Grooming': 'bg-orange-100 text-orange-700 border-orange-200',
+                        'Ready': 'bg-green-100 text-green-700 border-green-200'
+                    };
+
+                    const statusClass = statusColors[booking.status] || 'bg-gray-100 text-gray-700 border-gray-200';
+
+                    return `
+                        <div class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <div class="font-semibold text-gray-900">${booking.pet_name} (${booking.breed})</div>
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusClass} border">${booking.status}</span>
+                                    </div>
+                                    <div class="text-sm text-gray-600">RFID: ${booking.rfid} • Owner: ${booking.owner_name}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Add pagination if needed
+            if (pagination && pagination.total > currentStatusLimit) {
+                const totalPages = Math.ceil(pagination.total / currentStatusLimit);
+                html += createPagination('current', currentStatusPage, totalPages, pagination.has_more);
+            }
+
+            statusContainer.innerHTML = html;
+        }
+
+        // Update completed status display
+        function updateCompletedStatus(bookings, pagination) {
+            const statusContainer = document.getElementById('completedStatusContainer');
+
+            let html = '';
+
+            if (!bookings || bookings.length === 0) {
+                html = '<p class="text-gray-500 text-center py-4">No completed bookings for today</p>';
+            } else {
+                html = bookings.map(booking => {
+                    return `
+                        <div class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <div class="font-semibold text-gray-900">${booking.pet_name} (${booking.breed})</div>
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">Completed</span>
+                                    </div>
+                                    <div class="text-sm text-gray-600">RFID: ${booking.rfid} • Owner: ${booking.owner_name}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Add pagination if needed
+            if (pagination && pagination.total > completedStatusLimit) {
+                const totalPages = Math.ceil(pagination.total / completedStatusLimit);
+                html += createPagination('completed', completedStatusPage, totalPages, pagination.has_more);
+            }
+
+            statusContainer.innerHTML = html;
+        }
+
+        // Create pagination controls
+        function createPagination(type, currentPage, totalPages, hasMore) {
+            if (totalPages <= 1) return '';
+
+            let paginationHtml = '<div class="flex justify-center items-center mt-4 space-x-2">';
+
+            // Previous button
+            if (currentPage > 0) {
+                paginationHtml += `<button onclick="${type}Pagination(${currentPage - 1})" class="px-3 py-1 text-sm bg-gold-500 text-white rounded hover:bg-gold-600 transition-colors">Previous</button>`;
+            }
+
+            // Page numbers
+            const startPage = Math.max(0, currentPage - 2);
+            const endPage = Math.min(totalPages - 1, currentPage + 2);
+
+            if (startPage > 0) {
+                paginationHtml += `<button onclick="${type}Pagination(0)" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">1</button>`;
+                if (startPage > 1) {
+                    paginationHtml += '<span class="px-2 text-gray-500">...</span>';
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === currentPage;
+                const activeClass = isActive ? 'bg-gold-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300';
+                paginationHtml += `<button onclick="${type}Pagination(${i})" class="px-3 py-1 text-sm ${activeClass} rounded transition-colors">${i + 1}</button>`;
+            }
+
+            if (endPage < totalPages - 1) {
+                if (endPage < totalPages - 2) {
+                    paginationHtml += '<span class="px-2 text-gray-500">...</span>';
+                }
+                paginationHtml += `<button onclick="${type}Pagination(${totalPages - 1})" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">${totalPages}</button>`;
+            }
+
+            // Next button
+            if (hasMore) {
+                paginationHtml += `<button onclick="${type}Pagination(${currentPage + 1})" class="px-3 py-1 text-sm bg-gold-500 text-white rounded hover:bg-gold-600 transition-colors">Next</button>`;
+            }
+
+            paginationHtml += '</div>';
+            return paginationHtml;
+        }
+
+        // Pagination handlers
+        function currentPagination(page) {
+            currentStatusPage = page;
+            fetchCurrentStatus(page);
+        }
+
+        function completedPagination(page) {
+            completedStatusPage = page;
+            fetchCompletedStatus(page);
+        }
+
+        // Change period and update stats
+        function changePeriod(period) {
+            // Fetch new stats
+            fetchDashboardStats(period);
+
+            // Also refresh current status and completed status sections
+            fetchCurrentStatus();
+            fetchCompletedStatus();
+        }
+
+        // RFID Simulation
+        function simulateRFIDScan() {
+            const rfidStatus = document.querySelector('.rfid-status');
+            rfidStatus.textContent = 'Scanning...';
+
+            setTimeout(() => {
+                const randomTag = availableRFIDTags[Math.floor(Math.random() * availableRFIDTags.length)];
+                rfidStatus.textContent = `Tag Detected: ${randomTag}`;
+
+                // Find pet with this tag or create new entry
+                const pet = petData.find(p => p.rfid === randomTag);
+                if (pet) {
+                    updatePetStatus(pet);
+                }
+            }, 2000);
+        }
+
+        // Update pet status based on current status
+        function updatePetStatus(pet) {
+            const statusMap = {
+                'waiting': 'bathing',
+                'bathing': 'grooming',
+                'grooming': 'ready',
+                'ready': 'completed'
+            };
+
+            if (pet.status in statusMap) {
+                pet.status = statusMap[pet.status];
+                updateDashboard();
+
+                // Show notification
+                showNotification(`${pet.name} status updated to: ${pet.status}`);
+            }
+        }
+
+        // Show notification
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #667eea;
+                color: white;
+                padding: 1rem 2rem;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                z-index: 9999;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+
+        // Load customer content
+        function loadCustomerContent() {
+            const customerList = document.getElementById('customerList');
+            customerList.innerHTML = '';
+
+            customerData.forEach(customer => {
+                const customerItem = document.createElement('div');
+                customerItem.className = 'pet-item';
+                customerItem.innerHTML = `
+                    <div class="pet-info">
+                        <h4>${customer.name}</h4>
+                        <p>📞 ${customer.phone} • 📧 ${customer.email}</p>
+                        <p>🐕 Pets: ${customer.pets.join(', ')}</p>
+                        <p>📅 Visits: ${customer.visits} • Last: ${customer.lastVisit}</p>
+                    </div>
+                    <button class="btn btn-secondary" style="padding: 0.5rem 1rem;">View Profile</button>
+                `;
+                customerList.appendChild(petItem);
+            });
+        }
+
+        // Setup billing page
+        function setupBillingPage() {
+            const petSelect = document.getElementById('billPetSelect');
+            const billingSummary = document.getElementById('billingSummary');
+
+            petSelect.addEventListener('change', function() {
+                if (this.value) {
+                    billingSummary.style.display = 'block';
+                } else {
+                    billingSummary.style.display = 'none';
+                }
+            });
+        }
+
+        // Advance pet status
+        function advancePetStatus(rfid) {
+            const pet = petData.find(p => p.rfid === rfid);
+            if (pet) {
+                updatePetStatus(pet);
+            }
+        }
+
+        // Utility function to capitalize first letter
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        // Update dashboard statistics
+        function updateDashboard() {
+            const totalPets = petData.length;
+            const inProgress = petData.filter(p => p.status === 'bathing' || p.status === 'grooming').length;
+            const completed = petData.filter(p => p.status === 'ready' || p.status === 'completed').length;
+
+            document.getElementById('totalPets').textContent = totalPets;
+            document.getElementById('inProgress').textContent = inProgress;
+            document.getElementById('completed').textContent = completed;
+        }
+
+
+
+        // Add CSS animation for notifications
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Handle filter button clicks
+        function setupFilterButtons() {
+            console.log('Setting up filter buttons');
+            var buttons = ['today', 'week', 'month'];
+            for (var i = 0; i < buttons.length; i++) {
+                var period = buttons[i];
+                console.log('Setting up button for period:', period);
+                var button = document.getElementById('filter-' + period);
+                if (button) {
+                    console.log('Button found for period:', period);
+                    button.onclick = (function(p) {
+                        return function() {
+                            console.log('Button clicked for period:', p);
+                            // Update active button styling
+                            var allButtons = document.querySelectorAll('[id^="filter-"]');
+                            for (var j = 0; j < allButtons.length; j++) {
+                                allButtons[j].classList.remove('bg-gold-500', 'text-white', 'hover:bg-gold-600', 'bg-blue-500', 'hover:bg-blue-600');
+                                allButtons[j].classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                            }
+                            this.classList.add('bg-gold-500', 'text-white', 'hover:bg-gold-600');
+                            this.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+
+                            // Clear custom range selection and close modal if open
+                            document.getElementById('open-custom-range-modal').classList.remove('bg-blue-500', 'text-white', 'hover:bg-blue-600');
+                            document.getElementById('open-custom-range-modal').classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                            closeCustomRangeModal();
+
+                            // Clear global custom date variables
+                            currentCustomStartDate = null;
+                            currentCustomEndDate = null;
+
+                            // Update period and refresh data
+                            changePeriod(p);
+                        };
+                    })(period);
+                } else {
+                    console.log('Button NOT found for period:', period);
+                }
+            }
+
+            // Setup custom range modal
+            document.getElementById('open-custom-range-modal').onclick = function() {
+                openCustomRangeModal();
+            };
+
+            // Setup export button
+            document.getElementById('export-stats').onclick = function() {
+                exportDashboardStats();
+            };
+        }
+
+        // Custom Range Modal Functions
+        function openCustomRangeModal() {
+            const modal = document.getElementById('customRangeModal');
+            modal.classList.remove('hidden');
+
+            // Pre-fill with current values if any
+            const currentStart = document.getElementById('modalStartDate');
+            const currentEnd = document.getElementById('modalEndDate');
+
+            // You could pre-fill with current custom range values here if needed
+        }
+
+        function closeCustomRangeModal() {
+            const modal = document.getElementById('customRangeModal');
+            modal.classList.add('hidden');
+        }
+
+        function applyCustomRange() {
+            const startDate = document.getElementById('modalStartDate').value;
+            const endDate = document.getElementById('modalEndDate').value;
+
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+
+            if (startDate > endDate) {
+                alert('Start date cannot be after end date');
+                return;
+            }
+
+            // Store the custom dates globally for export functionality
+            currentCustomStartDate = startDate;
+            currentCustomEndDate = endDate;
+
+            // Update button styling
+            var allButtons = document.querySelectorAll('[id^="filter-"]');
+            for (var j = 0; j < allButtons.length; j++) {
+                allButtons[j].classList.remove('bg-gold-500', 'text-white', 'hover:bg-gold-600', 'bg-blue-500', 'hover:bg-blue-600');
+                allButtons[j].classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            }
+
+            // Highlight the custom range button
+            document.getElementById('open-custom-range-modal').classList.add('bg-blue-500', 'text-white', 'hover:bg-blue-600');
+            document.getElementById('open-custom-range-modal').classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+
+            // Fetch stats with custom date range
+            fetchDashboardStats('custom', startDate, endDate);
+
+            // Also refresh current status and completed status sections
+            fetchCurrentStatus();
+            fetchCompletedStatus();
+
+            // Close modal
+            closeCustomRangeModal();
+
+            showNotification('Custom date range applied successfully!', 'success');
+        }
+
+        function clearCustomRange() {
+            document.getElementById('modalStartDate').value = '';
+            document.getElementById('modalEndDate').value = '';
+            // Clear global custom date variables
+            currentCustomStartDate = null;
+            currentCustomEndDate = null;
+            closeCustomRangeModal();
+            changePeriod('today');
+            showNotification('Reset to today\'s statistics', 'info');
+        }
+
+        // Export dashboard statistics
+        async function exportDashboardStats() {
+            try {
+                // Get current filter state
+                const activeButton = document.querySelector('[id^="filter-"].bg-gold-500, [id^="filter-"].bg-blue-500');
+
+                let period = 'today'; // default
+                let exportParams = '';
+
+                if (activeButton) {
+                    const buttonId = activeButton.id.replace('filter-', '').replace('open-custom-range-modal', 'custom');
+                    if (buttonId === 'custom' && currentCustomStartDate && currentCustomEndDate) {
+                        // For custom range, use the stored dates
+                        exportParams = `period=custom&start_date=${currentCustomStartDate}&end_date=${currentCustomEndDate}`;
+                    } else {
+                        exportParams = `period=${buttonId}`;
+                    }
+                }
+
+                // Get auth token
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    showNotification('Authentication required. Please log in again.', 'error');
+                    return;
+                }
+
+                // Create download link with authentication
+                const exportUrl = `../api/dashboard_stats.php?action=export&${exportParams}`;
+                const link = document.createElement('a');
+                link.href = exportUrl;
+                link.download = `dashboard_stats_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+                // Add authorization header for the request
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Get the XLSX content as blob
+                const blob = await response.blob();
+
+                // Create object URL and download
+                const url = URL.createObjectURL(blob);
+                link.href = url;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // Clean up
+                URL.revokeObjectURL(url);
+
+                showNotification('Dashboard statistics exported successfully!', 'success');
+            } catch (error) {
+                console.error('Error exporting stats:', error);
+                showNotification('Error exporting statistics: ' + error.message, 'error');
+            }
+        }
+
+        // Authentication check
+        function checkAuthentication() {
+            const token = localStorage.getItem('auth_token');
+            const role = localStorage.getItem('auth_role');
+
+            if (!token || !role) {
+                // No authentication found, redirect to login
+                window.location.href = 'admin_staff_auth.html';
+                return false;
+            }
+
+            // Check if user has appropriate role for employee dashboard
+            if (!['admin', 'staff', 'manager', 'cashier'].includes(role)) {
+                // Invalid role, redirect to login
+                localStorage.clear(); // Clear invalid auth data
+                window.location.href = 'admin_staff_auth.html';
+                return false;
+            }
+
+            return true;
+        }
+
+        // Role-based navigation control
+        function setupRoleBasedNavigation() {
+            const userRole = localStorage.getItem('auth_role');
+
+            // Manager role already has the correct navigation, no changes needed
+            // This function ensures manager sees only: Dashboard, Appointments, Inventory, Vendors, Reports
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check authentication first
+            if (!checkAuthentication()) {
+                return; // Stop execution if not authenticated
+            }
+
+            // Set up role-based navigation
+            setupRoleBasedNavigation();
+
+            // Set up filter button click handlers
+            setupFilterButtons();
+
+            // Get period from URL or default to today
+            const urlParams = new URLSearchParams(window.location.search);
+            const initialPeriod = urlParams.get('period') || 'today';
+
+            // Set initial active button
+            changePeriod(initialPeriod);
+
+            // Fetch initial stats
+            fetchDashboardStats(initialPeriod);
+
+            // Fetch current status data
+            fetchCurrentStatus();
+
+            // Fetch completed status data
+            fetchCompletedStatus();
+        });
+    </script>
+</body>
+</html>

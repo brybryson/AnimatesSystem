@@ -75,7 +75,7 @@
   function updateStats(users) {
     // Calculate new 3-category statistics
     const stats = {
-      staffAdmin: users.filter(u => ['admin', 'manager', 'cashier', 'staff'].includes(u.role)).length,
+      staffAdmin: users.filter(u => ['admin', 'manager', 'cashier', 'staff', 'stock_controller'].includes(u.role)).length,
       customer: users.filter(u => u.role === 'customer').length,
       archived: users.filter(u => !u.is_active).length
     };
@@ -111,6 +111,10 @@
           archivedBadgeClasses = 'bg-blue-100 text-blue-700 border border-blue-200';
           archivedIcon = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>';
           break;
+        case 'stock_controller':
+          archivedBadgeClasses = 'bg-teal-100 text-teal-700 border border-teal-200';
+          archivedIcon = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>';
+          break;
         case 'customer':
           archivedBadgeClasses = 'bg-green-100 text-green-700 border border-green-200';
           archivedIcon = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
@@ -142,6 +146,10 @@
       case 'staff':
         badgeClasses = 'bg-blue-100 text-blue-700 border border-blue-200';
         icon = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>';
+        break;
+      case 'stock_controller':
+        badgeClasses = 'bg-teal-100 text-teal-700 border border-teal-200';
+        icon = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>';
         break;
       case 'customer':
         badgeClasses = 'bg-green-100 text-green-700 border border-green-200';
@@ -189,12 +197,12 @@
     const archivedUsers = users.filter(u => !u.is_active);
 
     // Apply filter to staff/admin users only
-    let staffUsers = activeUsers.filter(u => ['admin', 'manager', 'cashier', 'staff'].includes(u.role));
+    let staffUsers = activeUsers.filter(u => ['admin', 'manager', 'cashier', 'staff', 'stock_controller'].includes(u.role));
     if (staffFilter) {
       staffUsers = staffUsers.filter(u => u.role === staffFilter);
     }
     const customerUsers = activeUsers.filter(u => u.role === 'customer');
-    const archivedStaffUsers = archivedUsers.filter(u => ['admin', 'manager', 'cashier', 'staff'].includes(u.role));
+    const archivedStaffUsers = archivedUsers.filter(u => ['admin', 'manager', 'cashier', 'staff', 'stock_controller'].includes(u.role));
     const archivedCustomerUsers = archivedUsers.filter(u => u.role === 'customer');
 
     // Render staff/admin section in left column
@@ -484,7 +492,7 @@
     if (allUsers.length > 0) {
       // Just re-render with new filter, don't reload from API
       const val = filterRole.value;
-      const valid = val && ['admin','cashier','manager'].includes(val) ? val : undefined;
+      const valid = val && ['admin','cashier','manager','stock_controller'].includes(val) ? val : undefined;
       render(allUsers, valid);
     }
   });

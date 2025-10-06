@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PetCare Pro - Appointment Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#D4AF37',
+                        secondary: '#8C7A1E',
+                        gold: {
+                            50: '#FFFBEB',
+                            100: '#FEF3C7',
+                            200: '#FDE68A',
+                            300: '#FCD34D',
+                            400: '#FBBF24',
+                            500: '#D4AF37',
+                            600: '#D97706',
+                            700: '#B45309',
+                            800: '#92400E',
+                            900: '#78350F'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+        .gradient-bg { background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); }
+        .card-shadow { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        .btn-hover { transition: all 0.3s ease; }
+        .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(212, 175, 55, 0.4); }
+        .status-waiting { background: #fff3cd; color: #856404; }
+        .status-bathing { background: #cce5ff; color: #0066cc; }
+        .status-grooming { background: #ffe6cc; color: #cc6600; }
+        .status-ready { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex flex-col">
+    <!-- Decorative background elements -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-gold-200/30 to-gold-300/20 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-gold-100/30 to-gold-200/20 rounded-full blur-3xl"></div>
+    </div>
+
+    <header class="relative bg-white/80 backdrop-blur-sm shadow-sm border-b border-gold-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-gold-200 rounded-full blur-sm"></div>
+                        <img src="../animates_logo.png" alt="Animates Logo" class="relative h-14 w-14 object-contain">
+                    </div>
+                    <div>
+                        <p class="text-lg font-semibold text-gold-700">Animates PH</p>
+                        <p class="text-sm text-gold-600 font-medium">Camaro Branch</p>
+                        <p class="text-xs text-gray-500">Appointment Tracker</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative flex-grow px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- Page Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Appointment Tracker</h1>
+                <p class="text-gray-600">Real-time tracking of your pet's grooming progress</p>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8 text-center">
+                <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-10 h-10 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </div>
+                <p class="text-gray-500 text-lg">Loading appointment details...</p>
+            </div>
+
+            <!-- Appointment Details -->
+            <div id="appointmentDetails" class="hidden">
+                <!-- Pet Information Card -->
+                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8 mb-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                                </svg>
+                            </div>
+                            Pet Information
+                        </h2>
+                        <div id="rfidBadge" class="hidden bg-gold-100 text-gold-800 px-3 py-1 rounded-full text-sm font-medium">
+                            RFID: <span id="rfidTag" class="font-mono"></span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1">Pet Name</div>
+                            <div id="petName" class="text-lg font-semibold text-gray-900">-</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1">Pet Type & Breed</div>
+                            <div id="petDetails" class="text-lg font-semibold text-gray-900">-</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1">Owner</div>
+                            <div id="ownerName" class="text-lg font-semibold text-gray-900">-</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1">Appointment Date</div>
+                            <div id="appointmentDate" class="text-lg font-semibold text-gray-900">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Timeline -->
+                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8 mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        Service Progress
+                    </h2>
+
+                    <div class="space-y-4">
+                        <!-- Confirmed Status -->
+                        <div id="status-confirmed" class="flex items-start space-x-4 p-4 rounded-lg bg-gray-50">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-semibold text-gray-900">Appointment Confirmed</h3>
+                                    <span id="confirmed-time" class="text-sm text-gray-500">-</span>
+                                </div>
+                                <p class="text-gray-600">Your pet has been checked in and is ready for grooming services.</p>
+                            </div>
+                        </div>
+
+                        <!-- In Progress Status -->
+                        <div id="status-in-progress" class="flex items-start space-x-4 p-4 rounded-lg bg-gray-50 opacity-50">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-gold-100 rounded-full flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-gold-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-semibold text-gray-900">Services in Progress</h3>
+                                    <span id="in-progress-time" class="text-sm text-gray-500">-</span>
+                                </div>
+                                <p class="text-gray-600">Professional grooming services are currently being performed.</p>
+                            </div>
+                        </div>
+
+                        <!-- Completed Status -->
+                        <div id="status-completed" class="flex items-start space-x-4 p-4 rounded-lg bg-gray-50 opacity-50">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-semibold text-gray-900">Service Completed</h3>
+                                    <span id="completed-time" class="text-sm text-gray-500">-</span>
+                                </div>
+                                <p class="text-gray-600">Your pet's grooming is complete and ready for pickup!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Services Summary -->
+                <div class="bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-gold-100/50 p-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                        <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                        </div>
+                        Services Summary
+                    </h2>
+
+                    <div id="servicesList" class="space-y-3">
+                        <!-- Services will be populated here -->
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-4 mt-6">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-bold text-gray-900">Total Amount:</span>
+                            <span id="totalAmount" class="text-2xl font-bold text-gold-500">₱0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="hidden bg-white/90 backdrop-blur-sm rounded-2xl card-shadow border border-red-100/50 p-8 text-center">
+                <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Unable to Load Appointment</h3>
+                <p id="errorMessage" class="text-gray-600">Please check your tracking link and try again.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="text-center text-sm text-gray-500">
+                <p>&copy; 2025 Animates Pet Boutique & Grooming Salon. Professional Pet Care Services.</p>
+                <p class="mt-2">📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567 | 📧 animates.ph.fairview@gmail.com</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // API base URL
+        const API_BASE = 'http://localhost/animates/api/';
+
+        let refreshInterval = null;
+        let currentAppointmentData = null;
+        let trackingToken = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get tracking token from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            trackingToken = urlParams.get('token') || urlParams.get('appointment_id');
+
+            if (!trackingToken) {
+                showError('No tracking token provided. Please check your appointment confirmation email.');
+                return;
+            }
+
+            // Load initial data
+            loadAppointmentData();
+
+            // Start auto-refresh
+            startAutoRefresh();
+        });
+
+        async function loadAppointmentData() {
+            try {
+                const response = await fetch(`${API_BASE}appointments.php?action=get_appointment_details&appointment_id=${trackingToken}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': '' // Explicitly clear any Authorization header
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentAppointmentData = result.appointment;
+                    populateAppointmentDetails(result.appointment);
+                    showAppointmentDetails();
+                } else {
+                    showError(result.error || 'Failed to load appointment data');
+                }
+            } catch (error) {
+                console.error('Error loading appointment data:', error);
+                showError('Connection error. Please check your internet connection.');
+            }
+        }
+
+        function populateAppointmentDetails(appointment) {
+            // Pet Information
+            document.getElementById('petName').textContent = appointment.pet_name || 'Unknown Pet';
+            document.getElementById('petDetails').textContent = `${appointment.pet_type || 'Unknown'} • ${appointment.pet_breed || 'Unknown'}`;
+            document.getElementById('ownerName').textContent = appointment.owner_name || 'Unknown Owner';
+            document.getElementById('appointmentDate').textContent = formatAppointmentDate(appointment.appointment_date || '');
+
+            // RFID Badge
+            if (appointment.custom_rfid) {
+                document.getElementById('rfidTag').textContent = appointment.custom_rfid;
+                document.getElementById('rfidBadge').classList.remove('hidden');
+            }
+
+            // Status Timeline
+            updateStatusTimeline(appointment);
+
+            // Services
+            populateServices(appointment.services || []);
+            document.getElementById('totalAmount').textContent = `₱${parseFloat(appointment.total_amount || 0).toFixed(2)}`;
+        }
+
+        function updateStatusTimeline(appointment) {
+            const status = appointment.status;
+            const statusUpdates = appointment.status_updates || [];
+
+            // Reset all statuses
+            document.getElementById('status-confirmed').classList.add('opacity-50');
+            document.getElementById('status-in-progress').classList.add('opacity-50');
+            document.getElementById('status-completed').classList.add('opacity-50');
+
+            // Find timestamps from status updates
+            let confirmedTime = null;
+            let inProgressTime = null;
+            let completedTime = null;
+
+            statusUpdates.forEach(update => {
+                switch(update.status) {
+                    case 'confirmed':
+                        confirmedTime = update.created_at;
+                        break;
+                    case 'in-progress':
+                        inProgressTime = update.created_at;
+                        break;
+                    case 'completed':
+                        completedTime = update.created_at;
+                        break;
+                }
+            });
+
+            // Update confirmed status
+            if (['confirmed', 'in-progress', 'completed'].includes(status)) {
+                document.getElementById('status-confirmed').classList.remove('opacity-50');
+                if (confirmedTime) {
+                    document.getElementById('confirmed-time').textContent = formatTimestamp(confirmedTime);
+                }
+            }
+
+            // Update in-progress status
+            if (['in-progress', 'completed'].includes(status)) {
+                document.getElementById('status-in-progress').classList.remove('opacity-50');
+                if (inProgressTime) {
+                    document.getElementById('in-progress-time').textContent = formatTimestamp(inProgressTime);
+                }
+            }
+
+            // Update completed status
+            if (status === 'completed') {
+                document.getElementById('status-completed').classList.remove('opacity-50');
+                if (completedTime) {
+                    document.getElementById('completed-time').textContent = formatTimestamp(completedTime);
+                } else if (appointment.actual_completion) {
+                    document.getElementById('completed-time').textContent = formatTimestamp(appointment.actual_completion);
+                }
+            }
+        }
+
+        function populateServices(services) {
+            const container = document.getElementById('servicesList');
+
+            if (!services || services.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">No services selected</p>';
+                return;
+            }
+
+            container.innerHTML = services.map(service => `
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="font-medium text-gray-900">${service.name}</span>
+                            ${service.category ? `<p class="text-sm text-gray-600">${service.category}</p>` : ''}
+                        </div>
+                        <span class="text-lg font-bold text-gold-500">₱${parseFloat(service.price || 0).toFixed(2)}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatAppointmentDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+        }
+
+        function startAutoRefresh() {
+            // Refresh every 30 seconds
+            refreshInterval = setInterval(async () => {
+                try {
+                    await loadAppointmentData();
+                } catch (error) {
+                    console.error('Auto-refresh error:', error);
+                }
+            }, 30000);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        function showAppointmentDetails() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+            document.getElementById('appointmentDetails').classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('appointmentDetails').classList.add('hidden');
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorState').classList.remove('hidden');
+
+            stopAutoRefresh();
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
+    </script>
+</body>
+</html>

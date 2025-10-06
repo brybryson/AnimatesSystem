@@ -9,6 +9,7 @@ use CuyZ\Valinor\Compiler\Node;
 use CuyZ\Valinor\Type\CompositeTraversableType;
 use CuyZ\Valinor\Type\CompositeType;
 use CuyZ\Valinor\Type\Parser\Exception\Iterable\ShapedArrayElementDuplicatedKey;
+use CuyZ\Valinor\Type\DumpableType;
 use CuyZ\Valinor\Type\Type;
 
 use CuyZ\Valinor\Utility\Polyfill;
@@ -23,33 +24,37 @@ use function in_array;
 use function is_array;
 
 /** @internal */
-final class ShapedArrayType implements CompositeType
+final class ShapedArrayType implements CompositeType, DumpableType
 {
-    /** @var list<ShapedArrayElement> */
-    private array $elements;
-
     private bool $isUnsealed = false;
 
     private ?ArrayType $unsealedType = null;
 
+    public function __construct(
+        /** @var list<ShapedArrayElement> */
+        private array $elements,
+    ) {}
+
     /**
      * @no-named-arguments
      */
-    public function __construct(ShapedArrayElement ...$elements)
+    public static function from(ShapedArrayElement ...$elements): self
     {
-        $this->elements = $elements;
+        $self = new self($elements);
 
         $keys = [];
 
-        foreach ($this->elements as $elem) {
+        foreach ($elements as $elem) {
             $key = $elem->key()->value();
 
             if (in_array($key, $keys, true)) {
-                throw new ShapedArrayElementDuplicatedKey((string)$key, $this->toString());
+                throw new ShapedArrayElementDuplicatedKey((string)$key, $self->toString());
             }
 
             $keys[] = $key;
         }
+
+        return $self;
     }
 
     /**
@@ -57,7 +62,7 @@ final class ShapedArrayType implements CompositeType
      */
     public static function unsealed(ArrayType $unsealedType, ShapedArrayElement ...$elements): self
     {
-        $self = new self(...$elements);
+        $self = new self($elements);
         $self->isUnsealed = true;
         $self->unsealedType = $unsealedType;
 
@@ -69,7 +74,7 @@ final class ShapedArrayType implements CompositeType
      */
     public static function unsealedWithoutType(ShapedArrayElement ...$elements): self
     {
-        $self = new self(...$elements);
+        $self = new self($elements);
         $self->isUnsealed = true;
 
         return $self;
@@ -215,25 +220,17 @@ final class ShapedArrayType implements CompositeType
 
     public function traverse(): array
     {
-        $types = [];
+        $types = array_map(static fn (ShapedArrayElement $element) => $element->type(), $this->elements);
 
-        foreach ($this->elements as $element) {
-            $types[] = $type = $element->type();
-
-            if ($type instanceof CompositeType) {
-                $types = [...$types, ...$type->traverse()];
-            }
-        }
-
-        if ($this->isUnsealed) {
-            $types = [...$types, $this->unsealedType(), ...$this->unsealedType()->traverse()];
+        if (isset($this->unsealedType)) {
+            $types[] = $this->unsealedType;
         }
 
         return $types;
     }
 
     /**
-     * @return ShapedArrayElement[]
+     * @return list<ShapedArrayElement>
      */
     public function elements(): array
     {
@@ -245,10 +242,29 @@ final class ShapedArrayType implements CompositeType
         return ArrayType::native();
     }
 
+    public function dumpParts(): iterable
+    {
+        $elements = $this->elements;
+
+        yield 'array{';
+
+        while ($element = array_shift($elements)) {
+            $optional = $element->isOptional() ? '?' : '';
+            yield $element->key()->toString() .  "$optional: ";
+            yield $element->type();
+
+            if ($elements !== []) {
+                yield ', ';
+            }
+        }
+
+        yield '}';
+    }
+
     public function toString(): string
     {
         $signature = 'array{';
-        $signature .= implode(', ', array_map(fn (ShapedArrayElement $element) => $element->toString(), $this->elements));
+        $signature .= implode(', ', array_map(static fn (ShapedArrayElement $element) => $element->toString(), $this->elements));
 
         if ($this->isUnsealed) {
             $signature .= ', ...';

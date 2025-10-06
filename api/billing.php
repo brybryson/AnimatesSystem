@@ -1128,16 +1128,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
     }
 }
 
+// Handle GET request for report data
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_report_data') {
+    try {
+        // Get transactions data
+        $stmt = $db->prepare("
+            SELECT
+                st.id,
+                st.booking_id,
+                st.transaction_reference,
+                st.amount,
+                st.payment_method,
+                st.payment_platform,
+                st.discount_amount,
+                st.status,
+                st.created_at,
+                b.custom_rfid,
+                c.name as customer_name,
+                p.name as pet_name,
+                p.breed as pet_breed
+            FROM sales_transactions st
+            INNER JOIN bookings b ON st.booking_id = b.id
+            INNER JOIN pets p ON b.pet_id = p.id
+            INNER JOIN customers c ON p.customer_id = c.id
+            ORDER BY st.created_at DESC
+        ");
+        $stmt->execute();
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Get pending bills data with services
+        $stmt = $db->prepare("
+            SELECT
+                b.id,
+                b.id as booking_id,
+                b.custom_rfid,
+                b.total_amount,
+                b.status,
+                b.check_in_time,
+                GROUP_CONCAT(
+                    CONCAT(s.name, ' - ₱', FORMAT(bs.price, 2))
+                    ORDER BY s.name
+                    SEPARATOR '; '
+                ) as services,
+                c.name as customer_name,
+                c.phone as customer_phone,
+                c.email as customer_email,
+                p.name as pet_name,
+                p.breed as pet_breed,
+                p.type as pet_type,
+                p.size as pet_size
+            FROM bookings b
+            INNER JOIN pets p ON b.pet_id = p.id
+            INNER JOIN customers c ON p.customer_id = c.id
+            LEFT JOIN booking_services bs ON b.id = bs.booking_id
+            LEFT JOIN services s ON bs.service_id = s.id
+            WHERE b.payment_status != 'paid'
+            GROUP BY b.id, b.custom_rfid, b.total_amount, b.status, b.check_in_time,
+                     c.name, c.phone, c.email, p.name, p.breed, p.type, p.size
+            ORDER BY b.check_in_time DESC
+        ");
+        $stmt->execute();
+        $pendingBills = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'transactions' => $transactions,
+            'pending_bills' => $pendingBills
+        ]);
+
+    } catch (Exception $e) {
+        error_log("Error fetching report data: " . $e->getMessage());
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to fetch report data: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
 // Handle POST request for creating sales transactions (called when payment is processed)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'create_transaction') {
     try {
         $data = json_decode(file_get_contents('php://input'), true);
-        
+
         $bookingId = $data['booking_id'] ?? 0;
         $amount = $data['amount'] ?? 0;
         $paymentMethod = $data['payment_method'] ?? '';
         $paymentPlatform = $data['payment_platform'] ?? null;
-        
+
         if (empty($bookingId) || empty($amount) || empty($paymentMethod)) {
             echo json_encode([
                 'success' => false,
@@ -1145,22 +1223,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
             ]);
             exit;
         }
-        
+
         // Generate transaction reference
         $transactionReference = 'TXN-' . date('Ymd') . '-' . strtoupper(substr(md5(uniqid()), 0, 8));
-        
+
         // Insert transaction record
-        $stmt = $db->prepare("INSERT INTO sales_transactions 
-            (booking_id, transaction_reference, amount, payment_method, payment_platform, status) 
+        $stmt = $db->prepare("INSERT INTO sales_transactions
+            (booking_id, transaction_reference, amount, payment_method, payment_platform, status)
             VALUES (?, ?, ?, ?, ?, 'completed')");
         $stmt->execute([$bookingId, $transactionReference, $amount, $paymentMethod, $paymentPlatform]);
-        
+
         echo json_encode([
             'success' => true,
             'message' => 'Transaction created successfully',
             'transaction_reference' => $transactionReference
         ]);
-        
+
     } catch (Exception $e) {
         error_log("Error creating transaction: " . $e->getMessage());
         echo json_encode([

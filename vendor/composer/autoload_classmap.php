@@ -13,4 +13,5 @@ return array(
     'Grpc\\Gcp\\ApiConfig' => $vendorDir . '/google/grpc-gcp/src/generated/Grpc/Gcp/ApiConfig.php',
     'Grpc\\Gcp\\ChannelPoolConfig' => $vendorDir . '/google/grpc-gcp/src/generated/Grpc/Gcp/ChannelPoolConfig.php',
     'Grpc\\Gcp\\MethodConfig' => $vendorDir . '/google/grpc-gcp/src/generated/Grpc/Gcp/MethodConfig.php',
+    'Stringable' => $vendorDir . '/myclabs/php-enum/stubs/Stringable.php',
 );

@@ -819,6 +819,579 @@ function getProgressPercentage($status) {
 
 
 /**
+ * Send appointment status update email
+ */
+function sendAppointmentStatusEmail($appointmentId) {
+    try {
+        error_log("Email: Starting sendAppointmentStatusEmail for appointment ID: $appointmentId");
+
+        $db = getDB();
+        error_log("Email: Database connection successful");
+
+        // Get appointment details with all required information
+        $stmt = $db->prepare("
+            SELECT
+                a.id as appointment_id,
+                a.custom_rfid,
+                a.total_amount,
+                a.status as current_status,
+                p.name as pet_name,
+                p.type as pet_type,
+                p.breed as pet_breed,
+                p.age_range as pet_age,
+                u.full_name as owner_name,
+                u.phone as owner_phone,
+                u.email as owner_email,
+                GROUP_CONCAT(DISTINCT s.name SEPARATOR ', ') as services
+            FROM appointments a
+            JOIN pets p ON a.pet_id = p.id
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+            LEFT JOIN services2 s ON aps.service_id = s.id
+            WHERE a.id = ?
+            GROUP BY a.id
+        ");
+
+        $stmt->execute([$appointmentId]);
+        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+        error_log("Email: Appointment data retrieved: " . json_encode($appointment));
+
+        if (!$appointment || !$appointment['owner_email']) {
+            error_log("Email: No appointment found or no email address for appointment ID: $appointmentId");
+            throw new Exception('Appointment not found or no email address');
+        }
+
+        // Use current appointment status
+        $status = $appointment['current_status'];
+        error_log("Email: Current status: $status");
+
+        // Send email
+        $mail = new PHPMailer(true);
+        error_log("Email: PHPMailer initialized");
+
+        $mail->isSMTP();
+        $mail->Host       = 'smtp.gmail.com';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = 'animates.ph.fairview@gmail.com';
+        $mail->Password   = 'azzpxhvpufmmaips';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = 587;
+
+        $mail->setFrom('animates.ph.fairview@gmail.com', 'Animates PH - Camaro Branch');
+        $mail->addAddress($appointment['owner_email'], $appointment['owner_name']);
+
+        $mail->isHTML(true);
+        $friendlyMessage = getFriendlyStatusMessage($status, $appointment['pet_name']);
+        $mail->Subject = "Pet Grooming Update - {$friendlyMessage}";
+        $mail->Body = getAppointmentStatusEmailTemplate($appointment, $status, $friendlyMessage);
+
+        error_log("Email: Attempting to send email to: " . $appointment['owner_email']);
+        $mail->send();
+        error_log("Email: Email sent successfully to: " . $appointment['owner_email']);
+        return true;
+
+    } catch (Exception $e) {
+        error_log("Email: Email could not be sent. Mailer Error: {$e->getMessage()}");
+        error_log("Email: Error trace: " . $e->getTraceAsString());
+        return false;
+    }
+}
+
+/**
+ * Send appointment completion email
+ */
+function sendAppointmentCompletionEmail($appointmentId) {
+    try {
+        error_log("Email: Starting sendAppointmentCompletionEmail for appointment ID: $appointmentId");
+
+        $db = getDB();
+        error_log("Email: Database connection successful for completion email");
+
+        // Get appointment details with all required information
+        $stmt = $db->prepare("
+            SELECT
+                a.id as appointment_id,
+                a.custom_rfid,
+                a.total_amount,
+                a.status,
+                a.created_at as check_in_time,
+                a.actual_completion,
+                p.name as pet_name,
+                p.type as pet_type,
+                p.breed as pet_breed,
+                p.age_range as pet_age,
+                u.full_name as owner_name,
+                u.phone as owner_phone,
+                u.email as owner_email,
+                GROUP_CONCAT(DISTINCT s.name SEPARATOR ', ') as services
+            FROM appointments a
+            JOIN pets p ON a.pet_id = p.id
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+            LEFT JOIN services2 s ON aps.service_id = s.id
+            WHERE a.id = ?
+            GROUP BY a.id
+        ");
+        $stmt->execute([$appointmentId]);
+        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+        error_log("Email: Completion email - Appointment data retrieved: " . json_encode($appointment));
+
+        if (!$appointment) {
+            error_log("Email: Completion email - No appointment found for appointment ID: $appointmentId");
+            return false;
+        }
+
+        if (!$appointment['owner_email']) {
+            error_log("Email: Completion email - No email address found for appointment ID: $appointmentId");
+            return false;
+        }
+
+        if ($appointment['status'] !== 'completed') {
+            error_log("Email: Completion email - Appointment status is not 'completed' for appointment ID: $appointmentId, status: " . $appointment['status']);
+            return false;
+        }
+
+        // Send email
+        $mail = new PHPMailer(true);
+        error_log("Email: PHPMailer initialized for completion email");
+
+        $mail->isSMTP();
+        $mail->Host       = 'smtp.gmail.com';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = 'animates.ph.fairview@gmail.com';
+        $mail->Password   = 'azzpxhvpufmmaips';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = 587;
+
+        $mail->setFrom('animates.ph.fairview@gmail.com', 'Animates PH - Camaro Branch');
+        $mail->addAddress($appointment['owner_email'], $appointment['owner_name']);
+
+        $mail->isHTML(true);
+        $mail->Subject = "Thank You! {$appointment['pet_name']}'s Service Completed ";
+        $mail->Body = getAppointmentCompletionEmailTemplate($appointment);
+
+        error_log("Email: Attempting to send completion email to: " . $appointment['owner_email']);
+        $mail->send();
+        error_log("Email: Completion email sent successfully to: " . $appointment['owner_email']);
+        return true;
+
+    } catch (Exception $e) {
+        error_log("Email: Completion email could not be sent. Mailer Error: {$e->getMessage()}");
+        error_log("Email: Completion email error trace: " . $e->getTraceAsString());
+        return false;
+    }
+}
+
+/**
+ * Email template for appointment status updates
+ */
+function getAppointmentStatusEmailTemplate($appointment, $status, $friendlyMessage = null) {
+    $statusEmoji = [
+        'scheduled' => '📅',
+        'confirmed' => '✅',
+        'in-progress' => '🔄',
+        'completed' => '🎉'
+    ];
+
+    $statusColors = [
+        'scheduled' => '#6B7280',
+        'confirmed' => '#3B82F6',
+        'in-progress' => '#D4AF37',
+        'completed' => '#10B981'
+    ];
+
+    $currentEmoji = $statusEmoji[$status] ?? '📋';
+    $currentColor = $statusColors[$status] ?? '#667eea';
+
+    // Prepare conditional content
+    $ageInfo = '';
+    if ($appointment['pet_age']) {
+        $ageInfo = " • " . ucfirst($appointment['pet_age']);
+    }
+
+    $servicesSection = '';
+    if ($appointment['services']) {
+        $servicesSection = "
+                <div class='services-list'>
+                    <div class='info-label'>Services Selected</div>
+                    <div class='info-value'>{$appointment['services']}</div>
+                    <div style='font-size: 14px; color: #666; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;'>Total: ₱" . number_format($appointment['total_amount'], 2) . "</div>
+                </div>";
+    }
+
+    $readySection = '';
+    if ($status === 'completed') {
+        $readySection = "
+                <div style='background: #dcfce7; border: 2px solid #16a34a; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;'>
+                    <h3 style='color: #16a34a; margin: 0 0 10px 0;'>🎉 Ready for Pickup!</h3>
+                    <p style='margin: 0; color: #15803d;'>Your pet is all groomed and ready to go home! Please come by at your earliest convenience.</p>
+                </div>";
+    } else {
+        $readySection = "
+                <p>We'll send you another update when {$appointment['pet_name']} moves to the next stage. Thank you for choosing Animates PH - Camaro Branch!</p>";
+    }
+
+    return "
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>Pet Grooming Update</title>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, {$currentColor} 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .status-badge { background: {$currentColor}; color: white; padding: 8px 16px; border-radius: 20px; display: inline-block; font-weight: bold; margin: 10px 0; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+            .info-item { background: #f8f9fa; padding: 15px; border-radius: 8px; }
+            .info-label { font-size: 12px; color: #666; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+            .info-value { font-size: 16px; color: #333; font-weight: 500; }
+            .progress-bar { background: #e5e7eb; height: 8px; border-radius: 4px; margin: 20px 0; overflow: hidden; }
+            .progress-fill { background: {$currentColor}; height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+            .progress-labels {
+                display: table;
+                width: 100%;
+                table-layout: fixed;
+                font-size: 12px;
+                color: #666;
+                margin-top: 8px;
+            }
+            .progress-label {
+                display: table-cell;
+                text-align: center;
+                padding: 0 5px;
+            }
+            .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
+            .services-list { background: #f1f5f9; padding: 15px; border-radius: 8px; margin: 15px 0; }
+
+            @media only screen and (max-width: 600px) {
+                .info-grid { grid-template-columns: 1fr; gap: 10px; }
+                .progress-labels { font-size: 10px; }
+                .progress-label { padding: 0 2px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <div style='font-size: 48px; margin-bottom: 10px;'>{$currentEmoji}</div>
+                <h1 style='margin: 0; font-size: 28px;'>{$appointment['pet_name']} Update</h1>
+                <div class='status-badge' style='background: rgba(255,255,255,0.2); margin-top: 15px;'>
+                    Status: " . ucfirst($status) . "
+                </div>
+            </div>
+
+            <div class='content'>
+                <p style='font-size: 18px; margin-bottom: 25px;'>Hello {$appointment['owner_name']},</p>
+
+                <p>" . ($friendlyMessage ?: "We wanted to update you on {$appointment['pet_name']}'s grooming progress at Animates PH - Camaro Branch!") . "</p>
+
+                <div class='info-grid'>
+                    <div class='info-item'>
+                        <div class='info-label'>Pet Information</div>
+                        <div class='info-value'>{$appointment['pet_name']}</div>
+                        <div style='font-size: 14px; color: #666;'>{$appointment['pet_type']} • {$appointment['pet_breed']}{$ageInfo}</div>
+                    </div>
+                    <div class='info-item'>
+                        <div class='info-label'>Owner Contact</div>
+                        <div class='info-value'>{$appointment['owner_name']}</div>
+                        <div style='font-size: 14px; color: #666;'>{$appointment['owner_phone']}</div>
+                    </div>
+                </div>
+
+                {$servicesSection}
+
+                <div style='background: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0;'>
+                    <div class='info-label'>RFID Tag Assigned</div>
+                    <div style='font-family: monospace; font-size: 20px; font-weight: bold; color: #1d4ed8; margin: 5px 0;'>{$appointment['custom_rfid']}</div>
+                    <div style='font-size: 14px; color: #666;'>Current Status: <strong>" . ucfirst($status) . "</strong></div>
+                </div>
+
+                <div style='margin: 25px 0;'>
+                    <div style='font-size: 16px; font-weight: bold; margin-bottom: 10px;'>Grooming Progress</div>
+                    <div class='progress-bar'>
+                       <div class='progress-fill' style='width: " . getProgressPercentage($status) . "%;'></div>
+                    </div>
+                    <div class='progress-labels'>
+                        <div class='progress-label'>Confirmed</div>
+                        <div class='progress-label'>In Progress</div>
+                        <div class='progress-label'>Completed</div>
+                    </div>
+                </div>
+
+                {$readySection}
+
+                <p style='margin-top: 30px;'>Best regards,<br>
+                The Animates PH - Camaro Branch Team</p>
+            </div>
+
+            <div class='footer'>
+                <p>Animates PH - Camaro Branch<br>
+                📍 123 Pet Street, Quezon City | 📞 (02) 8123-4567<br>
+                📧 animates.ph.fairview@gmail.com</p>
+                <p style='margin-top: 15px; font-size: 12px; color: #999;'>
+                    This email was sent because you have an active appointment with us.
+                    Your RFID tag: {$appointment['custom_rfid']}
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+}
+
+/**
+ * Email template for appointment completion
+ */
+function getAppointmentCompletionEmailTemplate($appointment) {
+    // Calculate total service time
+    $checkInTime = new DateTime($appointment['check_in_time']);
+    $completionTime = new DateTime($appointment['actual_completion']);
+    $serviceTime = $checkInTime->diff($completionTime);
+
+    $timeSpent = '';
+    if ($serviceTime->h > 0) {
+        $timeSpent = $serviceTime->h . 'h ' . $serviceTime->i . 'm';
+    } else {
+        $timeSpent = $serviceTime->i . ' minutes';
+    }
+
+    return "
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>Service Completed - Thank You!</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+            .header {
+                background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+                color: white;
+                padding: 40px 30px;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+            .header::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+                animation: sparkle 3s ease-in-out infinite;
+            }
+            @keyframes sparkle {
+                0%, 100% { transform: rotate(0deg) scale(1); opacity: 0.3; }
+                50% { transform: rotate(180deg) scale(1.1); opacity: 0.7; }
+            }
+            .content { padding: 40px 30px; }
+            .celebration-banner {
+                background: linear-gradient(45deg, #FFD700, #FFA500);
+                margin: -40px -30px 30px -30px;
+                padding: 20px;
+                text-align: center;
+                color: #8B4513;
+                font-weight: bold;
+                font-size: 18px;
+                position: relative;
+            }
+            .celebration-banner::after {
+                content: '🎊 ✨ 🎊 ✨ 🎊 ✨ 🎊';
+                position: absolute;
+                top: -10px;
+                left: 0;
+                right: 0;
+                font-size: 12px;
+                animation: float 2s ease-in-out infinite;
+            }
+            @keyframes float {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-5px); }
+            }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 30px 0; }
+            .info-item {
+                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                padding: 20px;
+                border-radius: 12px;
+                border-left: 4px solid #10B981;
+                transition: transform 0.2s ease;
+            }
+            .info-item:hover { transform: translateY(-2px); }
+            .info-label { font-size: 12px; color: #666; text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
+            .info-value { font-size: 18px; color: #1a202c; font-weight: 600; }
+            .services-showcase {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 25px;
+                border-radius: 15px;
+                margin: 25px 0;
+                text-align: center;
+            }
+            .rating-section {
+                background: #fef7e6;
+                border: 2px dashed #f59e0b;
+                padding: 25px;
+                border-radius: 15px;
+                text-align: center;
+                margin: 25px 0;
+            }
+            .rating-stars {
+                font-size: 32px;
+                margin: 15px 0;
+                cursor: pointer;
+            }
+            .footer {
+                background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+                color: white;
+                padding: 30px;
+                text-align: center;
+                border-radius: 0 0 20px 20px;
+            }
+            .social-links {
+                margin-top: 20px;
+            }
+            .social-links a {
+                display: inline-block;
+                margin: 0 10px;
+                color: #60a5fa;
+                text-decoration: none;
+                font-size: 24px;
+                transition: transform 0.2s ease;
+            }
+            .social-links a:hover { transform: scale(1.2); }
+            .completion-badge {
+                display: inline-block;
+                background: #10B981;
+                color: white;
+                padding: 8px 20px;
+                border-radius: 25px;
+                font-size: 14px;
+                font-weight: bold;
+                margin: 15px 0;
+                box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            }
+
+            @media only screen and (max-width: 600px) {
+                .info-grid { grid-template-columns: 1fr; gap: 15px; }
+                .container { padding: 10px; }
+                .content { padding: 30px 20px; }
+                .celebration-banner { margin: -40px -20px 30px -20px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='card'>
+                <div class='header'>
+                    <div style='font-size: 64px; margin-bottom: 15px; position: relative; z-index: 1;'>🎉</div>
+                    <h1 style='margin: 0; font-size: 32px; position: relative; z-index: 1;'>Mission Accomplished!</h1>
+                    <p style='margin: 15px 0 0 0; opacity: 0.9; font-size: 18px; position: relative; z-index: 1;'>{$appointment['pet_name']} is looking fabulous!</p>
+                    <div class='completion-badge'>✨ SERVICE COMPLETED ✨</div>
+                </div>
+
+                <div class='content'>
+                    <div class='celebration-banner'>
+                        🏆 Another Happy Pet, Another Satisfied Family! 🏆
+                    </div>
+
+                    <p style='font-size: 20px; margin-bottom: 25px; color: #10B981; font-weight: 600;'>Dear {$appointment['owner_name']},</p>
+
+                    <p style='font-size: 16px; line-height: 1.8;'>
+                        We're thrilled to let you know that <strong>{$appointment['pet_name']}</strong> has successfully completed their pampering session at Animates PH - Camaro Branch!
+                        Your furry family member has been groomed to perfection and is ready to strut their stuff! ✨
+                    </p>
+
+                    <div class='info-grid'>
+                        <div class='info-item'>
+                            <div class='info-label'>📅 Service Summary</div>
+                            <div class='info-value'>{$appointment['pet_name']}</div>
+                            <div style='font-size: 14px; color: #666; margin-top: 5px;'>
+                                {$appointment['pet_type']} • {$appointment['pet_breed']}<br>
+                                Service Time: {$timeSpent}
+                            </div>
+                        </div>
+                        <div class='info-item'>
+                            <div class='info-label'>🏷️ Tracking Details</div>
+                            <div style='font-family: monospace; font-size: 16px; font-weight: bold; color: #1d4ed8; margin-bottom: 5px;'>{$appointment['custom_rfid']}</div>
+                            <div style='font-size: 14px; color: #666;'>
+                                Completed: " . date('M j, Y g:i A', strtotime($appointment['actual_completion'])) . "
+                            </div>
+                        </div>
+                    </div>
+
+                    " . ($appointment['services'] ? "
+                    <div class='services-showcase'>
+                        <h3 style='margin: 0 0 15px 0; font-size: 20px;'>✨ Services Completed ✨</h3>
+                        <div style='font-size: 18px; font-weight: 600;'>{$appointment['services']}</div>
+                        <div style='font-size: 24px; margin-top: 15px; font-weight: bold;'>Total: ₱" . number_format($appointment['total_amount'], 2) . "</div>
+                    </div>
+                    " : "") . "
+
+                    <div style='background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #10B981; padding: 25px; border-radius: 15px; margin: 25px 0; text-align: center;'>
+                        <h3 style='color: #065f46; margin: 0 0 15px 0; font-size: 22px;'>🌟 Thank You for Choosing Animates PH - Camaro Branch! 🌟</h3>
+                        <p style='margin: 0; color: #047857; font-size: 16px; line-height: 1.6;'>
+                            Your trust in our services means everything to us. We hope {$appointment['pet_name']} enjoyed their spa day as much as we enjoyed pampering them!
+                            We look forward to seeing you both again soon. 💕
+                        </p>
+                    </div>
+
+                    <div class='rating-section'>
+                        <h3 style='color: #92400e; margin: 0 0 10px 0;'>🌟 How did we do? 🌟</h3>
+                        <p style='color: #78350f; margin: 10px 0;'>We'd love to hear about your experience!</p>
+                        <div class='rating-stars'>⭐⭐⭐⭐⭐</div>
+                        <p style='font-size: 14px; color: #a16207; margin: 10px 0 0 0;'>
+                            Visit our Facebook page or Google Reviews to share your feedback!
+                        </p>
+                    </div>
+
+                    <div style='background: #fef3c7; border: 1px solid #fbbf24; padding: 20px; border-radius: 10px; margin: 25px 0; text-align: center;'>
+                        <h4 style='color: #92400e; margin: 0 0 10px 0;'>💡 Pet Care Tips</h4>
+                        <p style='font-size: 14px; color: #78350f; margin: 0; line-height: 1.6;'>
+                            To maintain {$appointment['pet_name']}'s fresh look: Brush regularly, keep ears clean, and book your next grooming session in 4-6 weeks!
+                        </p>
+                    </div>
+
+                    <p style='margin-top: 40px; font-size: 18px; text-align: center;'>
+                        With love and gratitude,<br>
+                        <strong style='color: #10B981;'>The Animates PH - Camaro Branch Family</strong> 🐾
+                    </p>
+                </div>
+
+                <div class='footer'>
+                    <h3 style='margin: 0 0 15px 0; color: #60a5fa;'>Stay Connected!</h3>
+                    <p style='margin: 15px 0;'>
+                        Animates PH - Camaro Branch<br>
+                        📍 123 Pet Street, Quezon City<br>
+                        📞 (02) 8123-4567 | 📧 animates.ph.fairview@gmail.com
+                    </p>
+
+                    <div class='social-links'>
+                        <a href='#' title='Facebook'>📘</a>
+                        <a href='#' title='Instagram'>📷</a>
+                        <a href='#' title='Google Reviews'>⭐</a>
+                        <a href='#' title='Website'>🌐</a>
+                    </div>
+
+                    <p style='margin-top: 20px; font-size: 12px; color: #9ca3af; opacity: 0.8;'>
+                        This email confirms that {$appointment['pet_name']}'s service has been completed.<br>
+                        Appointment ID: {$appointment['appointment_id']} | RFID: {$appointment['custom_rfid']}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+}
+
+/**
  * Send completion/pickup email when service is finished (tap 5)
  * Add this function to your email_functions.php file
  */

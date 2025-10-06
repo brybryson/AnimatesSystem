@@ -3,6 +3,9 @@ let refreshInterval = null;
 let currentBookingData = null;
 let trackingToken = null;
 let lastKnownStatus = null;
+let rfidPollingInterval = null;
+let lastRFIDTapTime = 0; // Track last RFID tap time to prevent rapid successive calls
+let isUpdatingStatus = false; // Prevent concurrent status updates
 
 // API base URL
 const API_BASE = 'http://localhost/animates/api/';
@@ -67,31 +70,34 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load initial data
     loadBookingData();
-    
+
     // Start auto-refresh with shorter interval for real-time updates
     startAutoRefresh();
+
+    // Start RFID polling for real-time status updates
+    startRFIDPolling();
 });
 
 async function loadBookingData() {
     try {
-        const response = await fetch(`${API_BASE}guest_dashboard.php?token=${trackingToken}`);
+        const response = await fetch(`${API_BASE}bookings.php?action=get_booking_details&rfid=${trackingToken}`);
         const result = await response.json();
-        
+
         if (result.success) {
             // Check for status changes
-            const newStatus = result.data.status;
+            const newStatus = result.appointment.status;
             if (lastKnownStatus && lastKnownStatus !== newStatus) {
                 showStatusChangeNotification(lastKnownStatus, newStatus);
                 // Add visual feedback for status change
                 highlightStatusChange();
             }
-            
+
             lastKnownStatus = newStatus;
-            currentBookingData = result.data;
-            populateDashboard(result.data);
+            currentBookingData = result.appointment;
+            populateDashboard(result.appointment);
             showDashboard();
         } else {
-            showError(result.message || 'Failed to load booking data');
+            showError(result.error || 'Failed to load booking data');
         }
     } catch (error) {
         console.error('Error loading booking data:', error);
@@ -165,33 +171,33 @@ function populateDashboard(data) {
     // Pet Information
     document.getElementById('petName').textContent = data.pet_name;
     document.getElementById('petDetails').textContent = `${data.pet_type} • ${data.pet_breed}${data.age_range ? ` • ${data.age_range}` : ''}${data.size ? ` • ${data.size}` : ''}`;
-    document.getElementById('bookingId').textContent = data.booking_id;
-    
+    document.getElementById('bookingId').textContent = data.booking_id; // Use booking_id from API response
+
     // Owner Information
     document.getElementById('ownerName').textContent = data.owner_name;
     document.getElementById('ownerContact').textContent = `${data.owner_phone}${data.owner_email ? ` • ${data.owner_email}` : ''}`;
-    
+
     // Booking Times
     document.getElementById('checkinTime').textContent = formatDateTime(data.check_in_time);
-    document.getElementById('estimatedTime').textContent = data.estimated_completion ? formatDateTime(data.estimated_completion) : 'To be determined';
-    
+    document.getElementById('estimatedTime').textContent = data.actual_completion ? formatDateTime(data.actual_completion) : 'To be determined';
+
     // Status
     updateStatus(data.status);
-    
+
     // Services
     populateServices(data.services);
-    
+
     // Total Amount
     document.getElementById('totalAmount').textContent = `₱${parseFloat(data.total_amount).toFixed(2)}`;
-    
+
     // Special Notes
-    if (data.special_notes && data.special_notes.trim()) {
+    if (data.staff_notes && data.staff_notes.trim()) {
         document.getElementById('specialNotesCard').classList.remove('hidden');
-        document.getElementById('specialNotesText').textContent = data.special_notes;
+        document.getElementById('specialNotesText').textContent = data.staff_notes;
     } else {
         document.getElementById('specialNotesCard').classList.add('hidden');
     }
-    
+
     // Update last refreshed time
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('en-PH', {
         hour: '2-digit',
@@ -321,8 +327,8 @@ function updateTimeline(currentStatus) {
 
         // Get timestamp for this step if available
         let stepTime = '';
-        if (currentBookingData && currentBookingData.status_history) {
-            const statusUpdate = currentBookingData.status_history.find(s => s.status === step);
+        if (currentBookingData && currentBookingData.status_updates) {
+            const statusUpdate = currentBookingData.status_updates.find(s => s.status === step);
             if (statusUpdate) {
                 stepTime = formatTime(statusUpdate.created_at);
             }
@@ -448,7 +454,7 @@ function populateServices(services) {
             <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
                 <div>
                     <span class="font-medium text-gray-900">${service.name}</span>
-                    <p class="text-sm text-gray-600">${service.description || 'Professional service'}</p>
+                    <p class="text-sm text-gray-600">${service.category || 'Professional service'}</p>
                 </div>
                 <span class="text-lg font-bold text-primary">₱${parseFloat(service.price || 0).toFixed(2)}</span>
             </div>
@@ -553,6 +559,114 @@ function stopAutoRefresh() {
     }
 }
 
+function startRFIDPolling() {
+    // Stop any existing polling
+    stopRFIDPolling();
+
+    // Poll every 5 seconds for RFID updates
+    rfidPollingInterval = setInterval(async () => {
+        try {
+            // Only poll if we have a tracking token (RFID)
+            if (!trackingToken) return;
+
+            const response = await fetch(`${API_BASE}rfid_endpoint.php?action=get_latest_rfid`, {
+                headers: {
+                    'Authorization': `Bearer dummy-token` // Guest dashboard doesn't need auth
+                }
+            });
+            const result = await response.json();
+
+            if (result.success && result.rfid) {
+                // Check if this RFID matches our tracking token (which is the RFID tag)
+                if (result.rfid === trackingToken) {
+                    // RFID tap detected for our booking - update status with debounce
+                    const now = Date.now();
+                    const timeSinceLastTap = now - lastRFIDTapTime;
+
+                    // Only process if it's been at least 8 seconds since last tap and not currently updating
+                    if (timeSinceLastTap > 8000 && !isUpdatingStatus) {
+                        console.log('RFID tap detected for our booking, updating status...');
+                        lastRFIDTapTime = now;
+                        await handleRFIDTapForStatusUpdate();
+                    } else {
+                        console.log('RFID tap ignored - too soon after previous tap or already updating');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('RFID polling error:', error);
+        }
+    }, 3000);
+}
+
+// Handle RFID tap for status update
+async function handleRFIDTapForStatusUpdate() {
+    if (isUpdatingStatus) {
+        console.log('Status update already in progress, skipping...');
+        return;
+    }
+
+    try {
+        isUpdatingStatus = true; // Set flag to prevent concurrent updates
+
+        // Don't increment tap count here - let the API determine the next status based on current status
+        console.log(`Processing RFID tap for booking status update (current status: ${lastKnownStatus})`);
+
+        // Call the booking status update API with current status to determine next status
+        const response = await fetch(`${API_BASE}bookings.php?action=update_booking_status&rfid=${trackingToken}&current_status=${lastKnownStatus}`);
+        const result = await response.json();
+
+        if (result && typeof result === 'object' && result.updated !== undefined) {
+            console.log('Booking status updated:', result);
+
+            // Show notification based on update result
+            if (result.updated) {
+                if (result.is_completion) {
+                    // Completion celebration
+                    celebrateCompletion();
+                    showNotification('🎉 Service completed! Thank you for choosing Animates PH!', 'success');
+                } else {
+                    // Status update notification
+                    showStatusChangeNotification(lastKnownStatus, result.new_status);
+                    showNotification(`Status updated: ${result.new_status}`, 'info');
+                }
+
+                // Email notification status
+                if (result.email_sent) {
+                    console.log('Email notification sent successfully');
+                } else {
+                    console.log('Email notification failed or not sent');
+                }
+            } else {
+                // Status didn't change (already at this status)
+                console.log('Status already at target level, no update needed');
+            }
+
+            // Refresh data to show updated status
+            await loadBookingData();
+
+        } else {
+            console.error('Failed to update booking status - invalid response:', result);
+            const errorMsg = (result && result.error) ? result.error : 'Invalid API response';
+            showNotification('Failed to update booking status: ' + errorMsg, 'error');
+        }
+
+    } catch (error) {
+        console.error('Error updating booking status:', error);
+        showNotification('Error updating booking status', 'error');
+    } finally {
+        // Always reset the updating flag
+        isUpdatingStatus = false;
+    }
+}
+
+function stopRFIDPolling() {
+    if (rfidPollingInterval) {
+        clearInterval(rfidPollingInterval);
+        rfidPollingInterval = null;
+    }
+}
+
 function showDashboard() {
     document.getElementById('loading-screen').classList.add('hidden');
     document.getElementById('error-screen').classList.add('hidden');
@@ -602,15 +716,56 @@ function formatTime(dateString) {
 // Cleanup on page unload
 window.addEventListener('beforeunload', function() {
     stopAutoRefresh();
+    stopRFIDPolling();
 });
 
 // Handle page visibility change (pause refresh when tab is hidden)
 document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
         stopAutoRefresh();
+        stopRFIDPolling();
     } else {
         startAutoRefresh();
+        startRFIDPolling();
         // Immediate refresh when tab becomes visible
         loadBookingData();
     }
 });
+
+// Notification function
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    const colors = {
+        success: 'bg-green-500',
+        error: 'bg-red-500',
+        warning: 'bg-yellow-500',
+        info: 'bg-blue-500'
+    };
+
+    notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <span class="mr-2">${type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '⚠' : 'ℹ'}</span>
+            <span>${message}</span>
+        </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Animate in
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+        notification.style.transition = 'transform 0.3s ease-out';
+    }, 100);
+
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
+    }, 4000);
+}

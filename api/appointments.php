@@ -37,7 +37,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 // JWT Helper functions
 function getBearerToken() {
     $headers = getAuthorizationHeader();
-    if (!empty($headers)) {
+    if (!empty($headers) && trim($headers) !== 'Bearer') {
         if (preg_match('/Bearer\s(\S+)/', $headers, $matches)) {
             return $matches[1];
         }
@@ -157,6 +157,9 @@ if ($method === 'GET') {
             break;
         case 'auto_cancel_overdue':
             handleAutoCancelOverdueAppointments();
+            break;
+        case 'auto_cancel_past_appointments':
+            handleAutoCancelPastAppointments();
             break;
         default:
             http_response_code(400);
@@ -399,8 +402,8 @@ function handleBookAppointment($input) {
         
         // Create appointment
         $stmt = $db->prepare("
-            INSERT INTO appointments (user_id, pet_id, appointment_date, appointment_time, estimated_duration, total_amount, special_instructions, status, package_customizations)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', ?)
+            INSERT INTO appointments (user_id, pet_id, appointment_date, appointment_time, estimated_duration, total_amount, special_instructions, status, package_customizations, custom_rfid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)
         ");
         $stmt->execute([
             $decoded->user_id,
@@ -410,7 +413,8 @@ function handleBookAppointment($input) {
             $totalDuration,
             $totalAmount,
             $input['specialInstructions'] ?? null,
-            isset($input['packageCustomizations']) ? json_encode($input['packageCustomizations']) : null
+            isset($input['packageCustomizations']) ? json_encode($input['packageCustomizations']) : null,
+            $input['rfidTag'] ?? null
         ]);
 
         $appointmentId = $db->lastInsertId();
@@ -420,9 +424,9 @@ function handleBookAppointment($input) {
         foreach ($services as $service) {
             $stmt->execute([$appointmentId, $service['id'], $service['price']]);
         }
-        
+
         $db->commit();
-        
+
         echo json_encode([
             'success' => true,
             'appointment_id' => $appointmentId,
@@ -618,42 +622,77 @@ function handleUpdateAppointment($input) {
 }
 
 function handleGetAppointmentDetails() {
-    $decoded = requireAuth();
+    // Check if user is authenticated
+    $token = getBearerToken();
+    $isAuthenticated = false;
+    $decoded = null;
+
+    if ($token) {
+        try {
+            $decoded = verifyJWT($token);
+            $isAuthenticated = true;
+        } catch(Exception $e) {
+            // Token is invalid, treat as unauthenticated
+            $isAuthenticated = false;
+        }
+    }
 
     try {
-        if (!isset($_GET['appointment_id']) || empty($_GET['appointment_id'])) {
-            throw new Exception('Appointment ID is required');
+        // Accept either appointment_id or rfid parameter for public tracking
+        $appointmentId = null;
+        $rfidTag = null;
+
+        if (isset($_GET['appointment_id']) && !empty($_GET['appointment_id'])) {
+            $appointmentId = $_GET['appointment_id'];
+        } elseif (isset($_GET['rfid']) && !empty($_GET['rfid'])) {
+            $rfidTag = strtoupper(trim($_GET['rfid']));
+        } else {
+            throw new Exception('Appointment ID or RFID tag is required');
         }
 
-        $appointmentId = intval($_GET['appointment_id']);
         $db = getDB();
 
-        // Get user role from database
-        $stmt = $db->prepare("SELECT role FROM users WHERE id = ? AND is_active = 1");
-        $stmt->execute([$decoded->user_id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$user) {
-            throw new Exception('User not found or inactive');
-        }
-
-        // Build query based on user role
+        // Build query - always include owner information for tracking
         $query = "SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
                   a.total_amount, a.status, a.special_instructions, a.package_customizations,
+                  a.custom_rfid, a.check_in_time, a.created_at, a.actual_completion,
                   p.id as pet_id, p.name as pet_name, p.type as pet_type, p.breed as pet_breed,
                   p.age_range as pet_age, p.size as pet_size, p.last_vaccine_date, p.vaccine_types,
-                  p.custom_vaccine, p.vaccination_proof
+                  p.custom_vaccine, p.vaccination_proof,
+                  u.full_name as owner_name, u.email as owner_email, u.phone as owner_phone
                   FROM appointments a
                   JOIN pets p ON a.pet_id = p.id
-                  WHERE a.id = ?";
+                  LEFT JOIN users u ON a.user_id = u.id";
 
-        $params = [$appointmentId];
+        $params = [];
 
-        // If not admin/manager/staff/cashier, restrict to user's own appointments
-        if (!in_array($user['role'], ['admin', 'manager', 'staff', 'cashier'])) {
-            $query .= " AND a.user_id = ?";
-            $params[] = $decoded->user_id;
+        // Set WHERE condition based on parameter
+        if ($appointmentId) {
+            $query .= " WHERE a.id = ?";
+            $params[] = $appointmentId;
+        } elseif ($rfidTag) {
+            $query .= " WHERE a.custom_rfid = ? AND a.status NOT IN ('cancelled')";
+            $params[] = $rfidTag;
         }
+
+        // If authenticated, check user permissions
+        if ($isAuthenticated) {
+            // Get user role from database
+            $stmt = $db->prepare("SELECT role FROM users WHERE id = ? AND is_active = 1");
+            $stmt->execute([$decoded->user_id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                throw new Exception('User not found or inactive');
+            }
+
+            // If not admin/manager/staff/cashier, restrict to user's own appointments
+            if (!in_array($user['role'], ['admin', 'manager', 'staff', 'cashier'])) {
+                $query .= " AND a.user_id = ?";
+                $params[] = $decoded->user_id;
+            }
+        }
+        // If not authenticated, allow public access to appointment details (for tracking)
 
         $stmt = $db->prepare($query);
         $stmt->execute($params);
@@ -665,11 +704,19 @@ function handleGetAppointmentDetails() {
 
         // Get services for the appointment
         $stmt = $db->prepare("SELECT s.id, s.name, s.category, aps.price
-                             FROM appointment_services aps
-                             JOIN services2 s ON aps.service_id = s.id
-                             WHERE aps.appointment_id = ?");
+                              FROM appointment_services aps
+                              JOIN services2 s ON aps.service_id = s.id
+                              WHERE aps.appointment_id = ?");
         $stmt->execute([$appointmentId]);
         $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Get status updates for the appointment
+        $stmt = $db->prepare("SELECT status, notes, created_at
+                              FROM appointment_status_updates
+                              WHERE appointment_id = ?
+                              ORDER BY created_at ASC");
+        $stmt->execute([$appointmentId]);
+        $statusUpdates = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Process package customizations if they exist
         $processedServices = [];
@@ -725,6 +772,7 @@ function handleGetAppointmentDetails() {
         }
 
         $appointment['services'] = $processedServices;
+        $appointment['status_updates'] = $statusUpdates;
 
         echo json_encode([
             'success' => true,
@@ -763,7 +811,7 @@ function handleGetAllAppointments() {
 
         $query = "SELECT a.id, a.appointment_date, a.appointment_time, a.estimated_duration,
                   a.total_amount, a.status, a.special_instructions, a.package_customizations,
-                  a.cancelled_by, a.cancelled_by_name, a.cancellation_remarks,
+                  a.cancelled_by, a.cancelled_by_name, a.cancellation_remarks, a.custom_rfid,
                   p.name as pet_name, p.type as pet_type, p.breed as pet_breed, p.size as pet_size,
                   p.last_vaccine_date, p.vaccine_types, p.custom_vaccine, p.vaccination_proof,
                   u.full_name as owner_name, u.email as owner_email
@@ -856,6 +904,9 @@ function handleAdmitAppointment($input) {
             throw new Exception('Appointment is not in scheduled status and cannot be admitted');
         }
 
+        // For testing purposes, allow admitting appointments at any time
+        // Original logic commented out below:
+        /*
         // Check if appointment date is today or in the past (allow admitting on the day of appointment)
         $appointmentDateTime = new DateTime($appointment['appointment_date'] . ' ' . $appointment['appointment_time']);
         $now = new DateTime(); // Current date and time
@@ -875,10 +926,14 @@ function handleAdmitAppointment($input) {
         if ($appointmentDate == $today && $appointmentDateTime > $now) {
             throw new Exception('Cannot admit appointment before the scheduled time. Please wait until ' . $appointmentDateTime->format('g:i A') . ' or later.');
         }
+        */
 
-        // Update appointment status to confirmed (admitted)
-        $stmt = $db->prepare("UPDATE appointments SET status = 'confirmed' WHERE id = ?");
+        // Update appointment status to confirmed (admitted) and set check-in time
+        $stmt = $db->prepare("UPDATE appointments SET status = 'confirmed', check_in_time = NOW() WHERE id = ?");
         $stmt->execute([$appointmentId]);
+
+        // Subtract inventory for confirmed appointment services
+        subtractInventoryForServices($db, $appointmentId);
 
         echo json_encode([
             'success' => true,
@@ -938,6 +993,128 @@ function handleAutoCancelOverdueAppointments() {
             'message' => "Auto-cancelled {$cancelledCount} overdue appointments",
             'cancelled_count' => $cancelledCount,
             'appointments_cancelled' => array_column($overdueAppointments, 'id')
+        ]);
+
+    } catch(Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
+function subtractInventoryForServices($db, $appointmentId) {
+    // Define service-to-inventory mappings (same as in services.php)
+    $serviceInventoryMap = [
+        // Basic Services
+        'Bath & Dry' => ['Premium Shampoo'],
+        'Nail Trimming & Grinding' => ['Professional Nail Clippers', 'Nail Grinding File'],
+        'Ear Cleaning & Inspection' => ['Cotton Swabs', 'Ear Cleaning Solution'],
+        'Haircut & Styling' => ['Clipper Machine', 'Professional Shears Set'],
+        'Teeth Cleaning' => ['Dental Cleaning Solution', 'Pet Toothbrush Set'],
+        'De-shedding Treatment' => ['De-shedding Shampoo'],
+
+        // Add-Ons
+        'Extra Nail Polish' => ['Nail Polish - Clear'],
+        'Scented Cologne' => ['Scented Cologne'],
+        'Bow or Bandana' => ['Decorative Bows Set', 'Bandana Set'],
+        'Paw Balm' => ['Paw Balm'],
+        'Whitening Shampoo' => ['Whitening Shampoo'],
+        'Flea & Tick Treatment' => ['Flea & Tick Spray'],
+
+        // Packages (will be checked based on their included services)
+        'Essential Grooming Package' => ['Premium Shampoo', 'Professional Nail Clippers', 'Cotton Swabs', 'Ear Cleaning Solution'],
+        'Full Grooming Package' => ['Premium Shampoo', 'Clipper Machine', 'Professional Shears Set', 'Professional Nail Clippers', 'Cotton Swabs', 'Ear Cleaning Solution', 'Dental Cleaning Solution', 'Pet Toothbrush Set', 'De-shedding Shampoo'],
+        'Bath & Brush Package' => ['Premium Shampoo', 'De-shedding Shampoo'],
+        'Spa Relaxation Package' => ['Premium Shampoo', 'Paw Balm', 'Scented Cologne']
+    ];
+
+    try {
+        // Get services for this appointment
+        $stmt = $db->prepare("SELECT s.name FROM appointment_services aps JOIN services2 s ON aps.service_id = s.id WHERE aps.appointment_id = ?");
+        $stmt->execute([$appointmentId]);
+        $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Collect all required inventory items
+        $inventoryToSubtract = [];
+        foreach ($services as $service) {
+            $serviceName = $service['name'];
+            $requiredItems = $serviceInventoryMap[$serviceName] ?? [];
+
+            foreach ($requiredItems as $itemName) {
+                if (!isset($inventoryToSubtract[$itemName])) {
+                    $inventoryToSubtract[$itemName] = 0;
+                }
+                $inventoryToSubtract[$itemName] += 1; // Subtract 1 unit per service
+            }
+        }
+
+        // Subtract inventory items
+        foreach ($inventoryToSubtract as $itemName => $quantity) {
+            // Check current quantity first
+            $stmt = $db->prepare("SELECT quantity FROM inventory WHERE name = ?");
+            $stmt->execute([$itemName]);
+            $currentItem = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($currentItem && $currentItem['quantity'] >= $quantity) {
+                // Subtract the quantity
+                $stmt = $db->prepare("UPDATE inventory SET quantity = quantity - ? WHERE name = ?");
+                $stmt->execute([$quantity, $itemName]);
+            } else {
+                // Log warning but don't fail the appointment - inventory might have been updated
+                error_log("Warning: Insufficient inventory for {$itemName}. Required: {$quantity}, Available: " . ($currentItem['quantity'] ?? 0));
+            }
+        }
+
+    } catch(Exception $e) {
+        // Log error but don't fail the appointment confirmation
+        error_log("Error subtracting inventory: " . $e->getMessage());
+    }
+}
+
+function handleAutoCancelPastAppointments() {
+    try {
+        $db = getDB();
+
+        // Get current date and time
+        $now = new DateTime();
+        $currentDate = $now->format('Y-m-d');
+        $currentTime = $now->format('H:i:s');
+
+        // Find appointments that should be auto-cancelled:
+        // 1. Status is 'scheduled' or 'confirmed' (but not completed)
+        // 2. Appointment date/time is in the past
+        $stmt = $db->prepare("
+            SELECT id, appointment_date, appointment_time, status
+            FROM appointments
+            WHERE status IN ('scheduled', 'confirmed')
+            AND (
+                appointment_date < ? OR
+                (appointment_date = ? AND CONCAT(appointment_date, ' ', appointment_time) < CONCAT(?, ' ', ?))
+            )
+        ");
+        $stmt->execute([$currentDate, $currentDate, $currentDate, $currentTime]);
+        $pastAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $cancelledCount = 0;
+
+        foreach ($pastAppointments as $appointment) {
+            // Auto-cancel the appointment
+            $stmt = $db->prepare("
+                UPDATE appointments
+                SET status = 'cancelled',
+                    cancelled_by = 0,
+                    cancelled_by_name = 'System',
+                    cancellation_remarks = 'Auto-cancelled: Past appointment time'
+                WHERE id = ?
+            ");
+            $stmt->execute([$appointment['id']]);
+            $cancelledCount++;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Auto-cancelled {$cancelledCount} past appointments",
+            'cancelled_count' => $cancelledCount,
+            'appointments_cancelled' => array_column($pastAppointments, 'id')
         ]);
 
     } catch(Exception $e) {

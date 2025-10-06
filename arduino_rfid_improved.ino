@@ -20,12 +20,15 @@ struct WiFiCredentials {
 };
 
 WiFiCredentials wifiList[] = {
-  {"HUAWEI-2.4G-x6Nj", "AFCEe3xU"}
+  {"Shiva", "ayawkonga"},
+  {"PLDTHOMEFIBRc11f8", "PLDTWIFIg9y9y"}
   // Add more WiFi credentials as needed
 };
 const int numWiFiNetworks = sizeof(wifiList) / sizeof(wifiList[0]);
+//192.168.1.58
+#define SERVER_URL "http://192.168.1.58/animates/api/rfid_endpoint.php" 
+// #define SERVER_URL "https://animates.infinityfree.me/animates/api/rfid_endpoint.php" 
 
-#define SERVER_URL "http://192.168.100.18/animates/api/rfid_endpoint.php"
 
 // Pin definitions for ESP32
 #define SS_PIN    21    // SDA/SS pin for RFID
@@ -65,7 +68,7 @@ const unsigned long DEBOUNCE_TIME = 500; // 500ms debounce
 unsigned long lastWiFiCheck = 0;
 int consecutiveWiFiFailures = 0;
 
-// Configuration structure
+// Configuration structure - UPDATED to 3 max taps
 struct DeviceConfig {
     int maxTaps;
     unsigned long validationTime;
@@ -75,11 +78,11 @@ struct DeviceConfig {
 };
 
 DeviceConfig config = {
-    .maxTaps = 5,
+    .maxTaps = 3, // CHANGED from 5 to 3
     .validationTime = 3000,
     .disableTime = 5000,
     .cardTimeout = 2000,
-    .serverUrl = "http://192.168.100.18/animates/api/rfid_endpoint.php"
+    .serverUrl = "http://192.168.1.58/animates/api/rfid_endpoint.php" 
 };
 
 // Add queue for failed uploads
@@ -92,6 +95,36 @@ struct FailedUpload {
 
 std::vector<FailedUpload> failedUploads;
 const int MAX_FAILED_UPLOADS = 10; // Maximum failed uploads to store
+
+// Function to debug WiFi status
+void debugWiFiStatus() {
+  Serial.println("========== WiFi Debug Info ==========");
+  Serial.println("WiFi Status: " + String(WiFi.status()));
+  Serial.println("WiFi Mode: " + String(WiFi.getMode()));
+  Serial.println("MAC Address: " + WiFi.macAddress());
+  
+  // Scan for available networks
+  Serial.println("Scanning for networks...");
+  int n = WiFi.scanNetworks();
+  if (n > 0) {
+    for (int i = 0; i < n; i++) {
+      Serial.printf("%d: %s (%d dBm) %s\n", 
+                    i + 1, 
+                    WiFi.SSID(i).c_str(), 
+                    WiFi.RSSI(i),
+                    (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "Open" : "Encrypted");
+      
+      // Check if this is our PLDT network
+      if (String(WiFi.SSID(i)) == "PLDTHOMEFIBRc11f8") {
+        Serial.println("   *** FOUND YOUR PLDT NETWORK! ***");
+      }
+    }
+  } else {
+    Serial.println("No networks found");
+  }
+  WiFi.scanDelete();
+  Serial.println("====================================");
+}
 
 // Function to generate Custom UID based on RFID UID (consistent for same card)
 String generateCustomUIDFromRFID(String rfidUID) {
@@ -122,6 +155,205 @@ String generateCustomUIDFromRFID(String rfidUID) {
   return customUID;
 }
 
+// Function to clear all stored card data - ADDED
+void clearAllStoredData() {
+  Serial.println("========================================");
+  Serial.println("🗑️ CLEARING ALL STORED CARD DATA");
+  Serial.println("========================================");
+  
+  // Clear in-memory maps
+  cardTapCount.clear();
+  cardCustomUID.clear();
+  
+  // Clear all preferences
+  preferences.clear();
+  
+  Serial.println("✅ All stored card data has been cleared!");
+  Serial.println("🔄 Device reset to factory state");
+  Serial.println("========================================");
+  
+  // Success indication
+  for(int i = 0; i < 5; i++) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    digitalWrite(STATUS_LED_PIN, HIGH);
+    delay(100);
+    digitalWrite(BUZZER_PIN, LOW);
+    digitalWrite(STATUS_LED_PIN, LOW);
+    delay(100);
+  }
+}
+
+// Fixed WiFi connection function
+void connectToWiFi() {
+  Serial.println("🌐 Initializing WiFi connection...");
+  
+  // Complete WiFi reset
+  WiFi.mode(WIFI_OFF);
+  delay(2000);
+  
+  // Clear all WiFi config
+  WiFi.persistent(false);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_STA);
+  delay(2000);
+  
+  // Scan for networks first
+  debugWiFiStatus();
+  
+  for (int i = 0; i < numWiFiNetworks; i++) {
+    Serial.printf("📡 Attempting connection to: %s\n", wifiList[i].ssid);
+    Serial.printf("🔑 Using password: %s\n", wifiList[i].password);
+    
+    // Ensure WiFi is ready
+    WiFi.mode(WIFI_STA);
+    delay(1000);
+    
+    // Clear any previous connection state
+    WiFi.disconnect();
+    delay(1000);
+    
+    // Start connection with explicit parameters
+    WiFi.begin(wifiList[i].ssid, wifiList[i].password);
+    Serial.println("🔄 Connection initiated...");
+    
+    // Extended wait with detailed status monitoring
+    int attempts = 0;
+    unsigned long startTime = millis();
+    
+    while (WiFi.status() != WL_CONNECTED && attempts < 40) { // 20 seconds timeout
+      delay(500);
+      Serial.print(".");
+      attempts++;
+      
+      // Print detailed status every 5 seconds
+      if (attempts % 10 == 0) {
+        Serial.println();
+        Serial.printf("🔍 Status after %d seconds: %d\n", attempts/2, WiFi.status());
+        Serial.printf("📊 WiFi Status Codes:\n");
+        Serial.printf("   WL_IDLE_STATUS = 0\n");
+        Serial.printf("   WL_NO_SSID_AVAIL = 1\n");
+        Serial.printf("   WL_SCAN_COMPLETED = 2\n");
+        Serial.printf("   WL_CONNECTED = 3\n");
+        Serial.printf("   WL_CONNECT_FAILED = 4\n");
+        Serial.printf("   WL_CONNECTION_LOST = 5\n");
+        Serial.printf("   WL_DISCONNECTED = 6\n");
+        Serial.printf("🎯 Current Status: %d\n", WiFi.status());
+        Serial.print("🔄 Continuing");
+      }
+      
+      // Check for immediate failures
+      if (WiFi.status() == WL_NO_SSID_AVAIL) {
+        Serial.println("\n❌ SSID not found!");
+        break;
+      }
+      if (WiFi.status() == WL_CONNECT_FAILED) {
+        Serial.println("\n❌ Authentication failed!");
+        break;
+      }
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println();
+      Serial.println("🎉 *** CONNECTION SUCCESSFUL! ***");
+      Serial.printf("✅ Connected to: %s\n", wifiList[i].ssid);
+      Serial.printf("🌐 IP Address: %s\n", WiFi.localIP().toString().c_str());
+      Serial.printf("🌐 Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+      Serial.printf("🌐 Subnet: %s\n", WiFi.subnetMask().toString().c_str());
+      Serial.printf("🌐 DNS: %s\n", WiFi.dnsIP().toString().c_str());
+      Serial.printf("📶 Signal Strength: %d dBm\n", WiFi.RSSI());
+      Serial.printf("📱 MAC Address: %s\n", WiFi.macAddress().c_str());
+      
+      // Test internet connectivity
+      Serial.println("🌍 Testing internet connectivity...");
+      HTTPClient http;
+      http.begin("http://google.com");
+      http.setTimeout(5000);
+      int httpCode = http.GET();
+      http.end();
+      
+      if (httpCode > 0) {
+        Serial.println("✅ Internet access confirmed!");
+      } else {
+        Serial.println("⚠️ No internet access detected");
+      }
+      
+      consecutiveWiFiFailures = 0;
+      return; // Exit function on successful connection
+    } else {
+      Serial.println();
+      Serial.printf("❌ Failed to connect to: %s\n", wifiList[i].ssid);
+      Serial.printf("💥 Final Status Code: %d\n", WiFi.status());
+      
+      // Analyze the failure
+      switch(WiFi.status()) {
+        case WL_NO_SSID_AVAIL:
+          Serial.println("🔍 Issue: Network name not found. Check SSID spelling.");
+          break;
+        case WL_CONNECT_FAILED:
+          Serial.println("🔑 Issue: Wrong password or network security mismatch.");
+          break;
+        case WL_IDLE_STATUS:
+          Serial.println("⏳ Issue: Connection timeout. Network may be too far.");
+          break;
+        default:
+          Serial.println("❓ Issue: Unknown connection problem.");
+          break;
+      }
+      
+      // Complete reset before trying next network
+      WiFi.disconnect(true);
+      delay(3000);
+    }
+  }
+  
+  // If we reach here, no WiFi networks worked
+  Serial.println("💥 ERROR: Could not connect to any WiFi network!");
+  Serial.println("🔧 Troubleshooting suggestions:");
+  Serial.println("   1. Verify SSID names are correct (case-sensitive)");
+  Serial.println("   2. Verify passwords are correct");
+  Serial.println("   3. Check if networks are in range");
+  Serial.println("   4. Ensure networks are broadcasting (not hidden)");
+  Serial.println("   5. Check router settings for MAC filtering");
+  
+  consecutiveWiFiFailures++;
+  
+  if (consecutiveWiFiFailures >= 3) {
+    Serial.println("🔄 Too many failures. Restarting ESP32 in 10 seconds...");
+    delay(10000);
+    ESP.restart(); // Restart the ESP32 to clear any WiFi state issues
+  } else {
+    Serial.println("🔄 Retrying all networks in 15 seconds...");
+    delay(15000);
+    connectToWiFi(); // Retry immediately
+  }
+}
+
+// Improved WiFi health monitoring
+void checkWiFiHealth() {
+  if (millis() - lastWiFiCheck > 30000) { // Check every 30 seconds
+    lastWiFiCheck = millis();
+    
+    if (WiFi.status() != WL_CONNECTED) {
+      consecutiveWiFiFailures++;
+      Serial.println("📶 WiFi disconnected. Attempt " + String(consecutiveWiFiFailures));
+      Serial.println("📊 WiFi Status Code: " + String(WiFi.status()));
+      
+      if (consecutiveWiFiFailures >= 3) {
+        Serial.println("🔄 Reconnecting to WiFi...");
+        // Proper WiFi reset before reconnection
+        WiFi.disconnect(true, true);
+        delay(3000);
+        connectToWiFi();
+        consecutiveWiFiFailures = 0;
+      }
+    } else {
+      consecutiveWiFiFailures = 0;
+      // Log WiFi stats periodically
+      Serial.println("📶 WiFi: " + WiFi.SSID() + " | Signal: " + String(WiFi.RSSI()) + " dBm | IP: " + WiFi.localIP().toString());
+    }
+  }
+}
+
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
@@ -130,6 +362,7 @@ void setup() {
   Serial.println();
   Serial.println("========================================");
   Serial.println("🚀 ESP32 RFID SCANNER STARTING UP");
+  Serial.println("📊 NEW CONFIGURATION: 3 TAPS MAXIMUM");
   Serial.println("========================================");
   
   // Initialize pins
@@ -140,13 +373,17 @@ void setup() {
   
   // Enable watchdog timer
   esp_task_wdt_config_t twdt_config = {
-    .timeout_ms = 30000, // 30 second timeout
+    .timeout_ms = 60000, // 60 second timeout (increased)
     .idle_core_mask = (1 << 0), // Bitmask for core 0
     .trigger_panic = true
   };
   esp_task_wdt_deinit(); // Ensure no watchdog is already configured
   esp_task_wdt_init(&twdt_config);
   esp_task_wdt_add(NULL);
+  
+  // Initialize preferences and clear all stored data - ADDED
+  preferences.begin("rfid_data", false);
+  clearAllStoredData(); // Clear all previous data on startup
   
   // Try to connect to WiFi networks
   connectToWiFi();
@@ -175,58 +412,15 @@ void setup() {
   // Show details of PCD - MFRC522 Card Reader
   mfrc522.PCD_DumpVersionToSerial();
   
-  // Initialize preferences and load data
-  preferences.begin("rfid_data", false);
-  loadCardData();
+  // Load configuration (updated values)
   loadConfig();
   
   Serial.println("========================================");
   Serial.println("🎯 RFID READER READY!");
   Serial.println("📱 Tap an RFID card/tag to read its ID");
   Serial.println("⏱️ Hold card for 3 seconds for validation");
+  Serial.println("🔢 Maximum 3 taps per service cycle");
   Serial.println("========================================");
-}
-
-void connectToWiFi() {
-  Serial.println("🌐 Connecting to WiFi networks...");
-  
-  for (int i = 0; i < numWiFiNetworks; i++) {
-    Serial.printf("📡 Attempting: %s\n", wifiList[i].ssid);
-    WiFi.begin(wifiList[i].ssid, wifiList[i].password);
-    
-    // Wait up to 10 seconds for connection
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-      delay(500);
-      Serial.print(".");
-      attempts++;
-    }
-    
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println();
-      Serial.printf("✅ Connected to: %s\n", wifiList[i].ssid);
-      Serial.printf("🌐 IP: %s\n", WiFi.localIP().toString().c_str());
-      Serial.printf("📶 Signal: %d dBm\n", WiFi.RSSI());
-      consecutiveWiFiFailures = 0;
-      return; // Exit function on successful connection
-    } else {
-      Serial.println();
-      Serial.printf("❌ Failed: %s\n", wifiList[i].ssid);
-      WiFi.disconnect();
-      delay(1000);
-    }
-  }
-  
-  // If we reach here, no WiFi networks worked
-  Serial.println("💥 ERROR: Could not connect to any WiFi network!");
-  Serial.println("🔍 Please check your credentials and try again.");
-  consecutiveWiFiFailures++;
-  
-  if (consecutiveWiFiFailures >= 3) {
-    Serial.println("🔄 Retrying WiFi connection in 30 seconds...");
-    delay(30000);
-    connectToWiFi(); // Retry the entire process
-  }
 }
 
 // Quick time setup - No hanging!
@@ -408,30 +602,6 @@ void loop() {
   delay(200);
 }
 
-// WiFi health monitoring
-void checkWiFiHealth() {
-  if (millis() - lastWiFiCheck > 30000) { // Check every 30 seconds
-    lastWiFiCheck = millis();
-    
-    if (WiFi.status() != WL_CONNECTED) {
-      consecutiveWiFiFailures++;
-      Serial.println("📶 WiFi disconnected. Attempt " + String(consecutiveWiFiFailures));
-      
-      if (consecutiveWiFiFailures >= 3) {
-        Serial.println("🔄 Reconnecting to WiFi...");
-        WiFi.disconnect();
-        delay(1000);
-        connectToWiFi();
-        consecutiveWiFiFailures = 0;
-      }
-    } else {
-      consecutiveWiFiFailures = 0;
-      // Log WiFi stats periodically
-      Serial.println("📶 WiFi: " + WiFi.SSID() + " | Signal: " + String(WiFi.RSSI()) + " dBm");
-    }
-  }
-}
-
 // Status LED indication
 void indicateStatus(const char* status) {
   if (strcmp(status, "scanning") == 0) {
@@ -517,13 +687,13 @@ String getRFIDStatus() {
   }
 }
 
-// Load configuration from preferences
+// Load configuration from preferences - UPDATED for 3 taps
 void loadConfig() {
-  config.maxTaps = preferences.getInt("maxTaps", 5);
+  config.maxTaps = preferences.getInt("maxTaps", 3); // CHANGED default from 5 to 3
   config.validationTime = preferences.getULong("validationTime", 3000);
   config.disableTime = preferences.getULong("disableTime", 5000);
   config.cardTimeout = preferences.getULong("cardTimeout", 2000);
-  config.serverUrl = preferences.getString("serverUrl", "http://192.168.100.18/animates/api/rfid_endpoint.php");
+  config.serverUrl = preferences.getString("serverUrl", "http://192.168.1.58/animates/api/rfid_endpoint.php" );
   
   Serial.println("⚙️ Configuration loaded:");
   Serial.println("   Max Taps: " + String(config.maxTaps));
@@ -533,39 +703,8 @@ void loadConfig() {
 }
 
 void loadCardData() {
-  Serial.println("📂 Loading saved card data...");
-  
-  // Load tap counts and custom UIDs from preferences
-  size_t keyCount = preferences.getBytesLength("cardKeys");
-  if (keyCount > 0) {
-    char* keys = (char*)malloc(keyCount);
-    preferences.getBytes("cardKeys", keys, keyCount);
-    
-    String keyString = String(keys);
-    free(keys);
-    
-    // Parse stored card UIDs
-    int startIndex = 0;
-    int endIndex = keyString.indexOf(',');
-    
-    while (endIndex != -1) {
-      String cardUID = keyString.substring(startIndex, endIndex);
-      if (cardUID.length() > 0) {
-        int tapCount = preferences.getInt(("tap_" + cardUID).c_str(), 0);
-        String customUID = preferences.getString(("uid_" + cardUID).c_str(), "");
-        
-        if (tapCount > 0 && customUID.length() > 0) {
-          cardTapCount[cardUID] = tapCount;
-          cardCustomUID[cardUID] = customUID;
-          Serial.println("📋 Loaded: " + cardUID + " - Taps: " + String(tapCount) + " - CustomUID: " + customUID);
-        }
-      }
-      
-      startIndex = endIndex + 1;
-      endIndex = keyString.indexOf(',', startIndex);
-    }
-  }
-  Serial.println("✅ Card data loading complete");
+  // REMOVED: No loading of previous data since we clear on startup
+  Serial.println("📂 Card data cleared on startup - starting fresh");
 }
 
 void saveCardData() {
@@ -584,7 +723,7 @@ void saveCardData() {
   Serial.println("💾 Card data saved to preferences");
 }
 
-// Improved card reuse logic with upload retry
+// Improved card reuse logic with upload retry - UPDATED for 3 taps
 String getOrCreateCustomUID(String cardUID) {
     // Check if card exists in our tracking
     if (cardTapCount.find(cardUID) == cardTapCount.end()) {
@@ -599,14 +738,14 @@ String getOrCreateCustomUID(String cardUID) {
     
     Serial.println("📊 Card: " + cardUID + " - Current Tap #" + String(currentTapCount) + "/" + String(config.maxTaps));
     
-    // Check if we need to reset for reuse (after max taps)
+    // Check if we need to reset for reuse (after max taps) - UPDATED for 3 taps
     if (currentTapCount >= config.maxTaps) {
         // Reset to 0 for new cycle
         cardTapCount[cardUID] = 0;
         // Generate new customUID with consistent seed
         String newSeed = cardUID + "_cycle_" + String(millis() / 60000); // Use minute-based seed
         cardCustomUID[cardUID] = generateCustomUIDFromRFID(newSeed);
-        Serial.println("🔄 Card completed cycle! New CustomUID generated: " + cardCustomUID[cardUID]);
+        Serial.println("🔄 Card completed 3-tap cycle! New CustomUID generated: " + cardCustomUID[cardUID]);
         Serial.println("🎫 Card ready for new customer assignment");
         currentTapCount = 0; // Reset current count
     }
@@ -679,7 +818,7 @@ bool validateCardData(String cardUID, String customUID, int tapCount) {
     return false;
   }
   
-  if (tapCount < 1 || tapCount > 10) {
+  if (tapCount < 1 || tapCount > 3) { // UPDATED: changed from 10 to 3
     Serial.println("❌ Invalid tap count");
     return false;
   }
@@ -695,6 +834,7 @@ bool sendToMySQLWithRetry(String cardUID, String customUID, int tapCount) {
     
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("❌ No WiFi connection. Cannot send data.");
+        Serial.println("📶 Current WiFi Status: " + String(WiFi.status()));
         indicateStatus("error");
         return false;
     }
@@ -742,7 +882,7 @@ bool sendToMySQLWithRetry(String cardUID, String customUID, int tapCount) {
     HTTPClient http;
     http.begin(config.serverUrl);
     http.addHeader("Content-Type", "application/json");
-    http.setTimeout(10000); // 10 second timeout
+    http.setTimeout(15000); // 15 second timeout
     
     Serial.println("📡 Sending HTTP request...");
     
@@ -751,6 +891,8 @@ bool sendToMySQLWithRetry(String cardUID, String customUID, int tapCount) {
     int httpResponseCode = 0;
     
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        Serial.println("🔄 Attempt " + String(attempt) + "/" + String(maxRetries));
+        
         httpResponseCode = http.POST(jsonString);
         
         if (httpResponseCode > 0) {
@@ -815,24 +957,28 @@ bool sendToMySQLWithRetry(String cardUID, String customUID, int tapCount) {
                 return true; // Success!
             } else {
                 Serial.println("⚠️ Server responded with non-200 code: " + String(httpResponseCode));
+                Serial.println("📝 Response: " + response);
                 if (attempt < maxRetries) {
-                    Serial.println("🔄 Retrying in 2 seconds... (Attempt " + String(attempt + 1) + "/" + String(maxRetries) + ")");
-                    delay(2000);
+                    Serial.println("🔄 Retrying in 3 seconds... (Attempt " + String(attempt + 1) + "/" + String(maxRetries) + ")");
+                    delay(3000);
                 }
             }
-            Serial.println("📝 Response: " + response);
         } else {
             Serial.println("❌ Failed to send to database (Attempt " + String(attempt) + "/" + String(maxRetries) + ")");
             Serial.println("💥 Error Code: " + String(httpResponseCode));
+            Serial.println("📶 WiFi Status: " + String(WiFi.status()));
+            Serial.println("🌐 Connected to: " + WiFi.SSID());
+            Serial.println("📶 Signal: " + String(WiFi.RSSI()) + " dBm");
             
             if (attempt < maxRetries) {
-                Serial.println("🔄 Retrying in 3 seconds...");
-                delay(3000);
+                Serial.println("🔄 Retrying in 5 seconds...");
+                delay(5000);
             } else {
                 Serial.println("🔍 Final failure. Possible issues:");
                 Serial.println("   • Server not running");
-                Serial.println("   • Wrong URL");
-                Serial.println("   • Network connectivity");
+                Serial.println("   • Wrong URL: " + config.serverUrl);
+                Serial.println("   • Network connectivity issues");
+                Serial.println("   • Firewall blocking requests");
                 indicateStatus("error");
             }
         }

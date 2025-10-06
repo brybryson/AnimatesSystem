@@ -54,7 +54,7 @@ form.addEventListener('submit', async (e) => {
      if (!actualRole) throw new Error('Unable to determine user role');
 
      // Check if role is allowed for employee login
-     if (!['admin', 'staff', 'manager', 'cashier'].includes(actualRole)) {
+     if (!['admin', 'staff', 'manager', 'cashier', 'stock_controller'].includes(actualRole)) {
        throw new Error('Access denied. Employee role required.');
      }
 
@@ -72,15 +72,19 @@ form.addEventListener('submit', async (e) => {
        }
      }
 
-     // Show success modal
-     successModal.classList.remove('hidden');
+     // Redirect based on role immediately after successful login
+     let redirectUrl;
+     if (actualRole === 'cashier') {
+       redirectUrl = 'billing_management.html';
+     } else if (actualRole === 'manager') {
+       redirectUrl = 'dashboard_manager.html';
+     } else if (actualRole === 'stock_controller') {
+       redirectUrl = 'inventory_management_stock_controller.html';
+     } else {
+       redirectUrl = 'dashboard_employees.html';
+     }
 
-     // Redirect all employee roles to the employee dashboard
-     let redirectUrl = 'dashboard_employees.html';
-
-     setTimeout(() => {
-       window.location.href = redirectUrl;
-     }, 2000);
+     window.location.href = redirectUrl;
    } catch (err) {
      errorEl.textContent = err.message || 'Sign-in error';
      errorEl.classList.remove('hidden');

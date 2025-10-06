@@ -13,5 +13,6 @@ return array(
     '1232758e40b1d31bb295b6907de02c63' => $vendorDir . '/beste/clock/src/Clock.php',
     '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => $vendorDir . '/symfony/polyfill-mbstring/bootstrap.php',
     '06b8a576aaa70a8517a94b7ff6b37e5c' => $vendorDir . '/beste/json/src/Json.php',
+    '2cffec82183ee1cea088009cef9a6fc3' => $vendorDir . '/ezyang/htmlpurifier/library/HTMLPurifier.composer.php',
     'b067bc7112e384b61c701452d53a14a8' => $vendorDir . '/mtdowling/jmespath.php/src/JmesPath.php',
 );

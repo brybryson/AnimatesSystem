@@ -134,9 +134,10 @@
 
         // Validation functions
         function validatePhoneNumber(phone) {
-            // Must start with "09", exactly 11 digits, no letters
+            // Remove dashes and spaces, then validate: must start with "09", exactly 11 digits, no letters
+            const cleanPhone = phone.replace(/[-\s]/g, '');
             const phoneRegex = /^09\d{9}$/;
-            return phoneRegex.test(phone);
+            return phoneRegex.test(cleanPhone);
         }
 
         function validateName(name) {
@@ -362,7 +363,7 @@
         firstName: document.getElementById('firstName').value,
         lastName: document.getElementById('lastName').value,
         email: document.getElementById('signupEmail').value,
-        phone: document.getElementById('signupPhone').value,
+        phone: document.getElementById('signupPhone').value.replace(/-/g, ''), // Remove dashes for backend
         address: document.getElementById('signupAddress').value,
         password: document.getElementById('signupPassword').value,
         // marketingEmails: document.getElementById('marketingEmails').checked
@@ -802,7 +803,7 @@ async function resendResetCode() {
         }
 
         function validateSignupPhone() {
-            return validateField('signupPhone', validatePhoneNumber, 'Phone number must start with "09" and be exactly 11 digits');
+            return validateField('signupPhone', validatePhoneNumber, 'Phone number must start with "09" and be exactly 11 digits (dashes will be removed automatically)');
         }
 
         // Initialize page

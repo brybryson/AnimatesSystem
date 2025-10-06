@@ -42,7 +42,7 @@ function handleCreateUser($input) {
             throw new Exception('Password must be at least 8 characters with uppercase, lowercase, number and special character');
         }
 
-        if (!in_array($input['role'], ['admin','manager','cashier'])) { throw new Exception('Invalid role'); }
+        if (!in_array($input['role'], ['admin','manager','cashier','stock_controller'])) { throw new Exception('Invalid role'); }
 
         $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
         $stmt->execute([$input['email']]);
@@ -53,7 +53,9 @@ function handleCreateUser($input) {
         $username = $input['username'] ?? explode('@', $input['email'])[0];
 
         // Insert using updated schema columns
-        $stmt = $db->prepare("INSERT INTO users (full_name,email,phone,address,birthdate,role,username,password,is_active) VALUES (?,?,?,?,?,?,?,?,1)");
+        // For employee roles created by admin, set email_verified = 1
+        $emailVerified = in_array($input['role'], ['admin', 'staff', 'manager', 'cashier']) ? 1 : 0;
+        $stmt = $db->prepare("INSERT INTO users (full_name,email,phone,address,birthdate,role,username,password,is_active,email_verified) VALUES (?,?,?,?,?,?,?,?,1,?)");
         $stmt->execute([
             $fullName,
             $input['email'],
@@ -62,7 +64,8 @@ function handleCreateUser($input) {
             $input['birthdate'] ?: null,
             $input['role'],
             $username,
-            $passwordHash
+            $passwordHash,
+            $emailVerified
         ]);
         $newUserId = $db->lastInsertId();
         $check = $db->prepare("SELECT id, full_name, email, phone, address, birthdate, role, is_active, username FROM users WHERE id = ?");
@@ -82,7 +85,7 @@ function handleListUsers($input) {
         requireAdmin();
         $db = getDB();
         $role = $input['filter_role'] ?? null;
-        $validRoles = ['admin','cashier','staff','customer','manager'];
+        $validRoles = ['admin','cashier','staff','customer','manager','stock_controller'];
         if ($role && in_array($role, $validRoles, true)) {
             $stmt = $db->prepare("SELECT id,full_name,email,phone,address,birthdate,role,is_active,username FROM users WHERE role = ? ORDER BY id DESC");
             $stmt->execute([$role]);
@@ -105,7 +108,7 @@ function handleUpdateUserRole($input) {
         $userId = (int)($input['user_id'] ?? 0);
         if (!$userId) throw new Exception('user_id is required');
         $role = $input['role'] ?? null;
-        if ($role && !in_array($role, ['admin','staff','customer','cashier'])) throw new Exception('Invalid role');
+        if ($role && !in_array($role, ['admin','staff','customer','cashier','manager','stock_controller'])) throw new Exception('Invalid role');
         if ($role) {
             $stmt = $db->prepare("UPDATE users SET role = ? WHERE id = ?");
             $stmt->execute([$role, $userId]);
